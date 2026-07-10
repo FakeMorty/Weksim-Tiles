@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self' data: blob:;">
+<title>RHYTHM SHOOTER // neon tiles v1.5 STFT</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Orbitron:wght@600;800&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-user-select:none;}
+  html,body{height:100%;background:#05060d;color:#cfefff;font-family:'JetBrains Mono',monospace;overflow:hidden;}
+  canvas{display:block;width:100vw;height:100vh;background: radial-gradient(1200px 800px at 50% -10%, #0f1430 0%, #05060d 55%, #03040a 100%);}
+  #menu, #result{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(3,5,12,0.92);backdrop-filter:blur(10px);z-index:10;transition:opacity .3s;}
+  #result{display:none;}
+  h1{font-family:'Orbitron',sans-serif;font-weight:800;letter-spacing:.08em;font-size: clamp(28px,5vw,52px);color:#7efaff;text-shadow:0 0 18px #00e5ff88, 0 0 42px #6a00ff44;margin-bottom:8px;}
+  .subtitle{color:#7aa3b8;font-size:13px;margin-bottom:26px;letter-spacing:.12em;text-transform:uppercase;}
+  .panel{width:min(760px,95vw); background: linear-gradient(180deg,#0b1124aa,#070a18cc);border:1px solid #1d2a4a; border-radius:18px; padding:24px 24px 20px; box-shadow:0 0 40px #0066ff18 inset, 0 10px 50px #0008;}
+  .dropzone{border:1.8px dashed #2a4a7a; border-radius:14px; padding:28px 18px; text-align:center; cursor:pointer;transition:.2s; color:#88b8d8; background:#0a1230aa;}
+  .dropzone:hover,.dropzone.dragover{border-color:#51f0ff; background:#0d1b44; color:#cfffff; box-shadow:0 0 22px #00eaff22 inset;}
+  .dropzone strong{color:#eaffff}
+  #fileInput{display:none}
+  .row{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px;align-items:center}
+  .modes{display:flex;gap:10px;flex-wrap:wrap}
+  .mode-btn{flex:1; min-width:150px; padding:12px 14px; border-radius:12px; border:1px solid #2a3c66; background:#0d1630;color:#9ecae8; font-family:'JetBrains Mono',monospace; font-weight:700; cursor:pointer; letter-spacing:.04em;transition:.15s; text-transform:uppercase; font-size:13px;}
+  .mode-btn.active{border-color:#00f6ff; color:#dfffff; background:#0e2248; box-shadow:0 0 18px #00e5ff33, inset 0 0 16px #00bfff18; text-shadow:0 0 8px #6cf;}
+  .mode-btn small{display:block; font-weight:400; color:#6d9ab6; font-size:11px; margin-top:3px; text-transform:none}
+  .mode-btn.active small{color:#9eeaff}
+  .sliders{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px}
+  @media(max-width:760px){.sliders{grid-template-columns:1fr 1fr}}
+  @media(max-width:520px){.sliders{grid-template-columns:1fr}}
+  .slider-box{background:#0a1126; border:1px solid #1b2a4d; border-radius:12px; padding:12px 14px}
+  .slider-box label{font-size:11px; color:#6a8fb0; text-transform:uppercase; letter-spacing:.08em; display:flex; justify-content:space-between}
+  .slider-box input, .slider-box select{width:100%; margin-top:8px; accent-color:#00e5ff; background:#08132a; color:#bfefff; border:1px solid #1d3358; border-radius:8px; padding:6px; font-family:'JetBrains Mono',monospace}
+  .slider-box input:disabled{opacity:.45}
+  .toggle-row{display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; font-size:12px; color:#7aa9c6; align-items:center}
+  .toggle-row label{display:flex; align-items:center; gap:7px; cursor:pointer}
+  .toggle-row input, .toggle-row select{accent-color:#00e5ff}
+  .toggle-row select{background:#0a1a34; color:#bfefff; border:1px solid #254567; border-radius:7px; padding:4px 8px; font-family:'JetBrains Mono',monospace; font-size:12px}
+  .play-btn{width:100%; margin-top:18px; padding:16px; font-size:16px; font-weight:700; letter-spacing:.08em;border:none; border-radius:14px; cursor:pointer; color:#02121a; text-transform:uppercase;background:linear-gradient(90deg,#00f0ff,#7b61ff); box-shadow:0 0 26px #00d9ff55, 0 6px 24px #000a;font-family:'Orbitron',sans-serif; transition:.15s;}
+  .play-btn:hover{filter:brightness(1.08); transform:translateY(-1px)}
+  .play-btn:disabled{opacity:.45; cursor:not-allowed; filter:grayscale(.4)}
+  .hint{font-size:12px; color:#5e8099; margin-top:12px; line-height:1.55}
+  .keycaps span{display:inline-block;border:1px solid #2b4a70;background:#0b1a34;border-radius:6px;padding:2px 8px;margin:0 3px;color:#bfefff;box-shadow:0 0 10px #00aaff22 inset}
+  /* HUD */
+  #hud{position:absolute;top:0;left:0;right:0;pointer-events:none;z-index:5;padding:14px 18px;display:none;justify-content:space-between;align-items:flex-start}
+  #hudLeft,#hudRight{display:flex;flex-direction:column;gap:6px}
+  .hud-pill{background:#061124cc; border:1px solid #1a3458; border-radius:10px; padding:7px 12px; font-size:13px; color:#aee9ff; backdrop-filter:blur(6px)}
+  .hud-big{font-family:'Orbitron',sans-serif; font-size:22px; color:#eaffff; text-shadow:0 0 10px #00eaffaa}
+  #comboText{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-family:'Orbitron',sans-serif;font-size: clamp(26px,5vw,44px);color:#fff; text-shadow:0 0 18px #ff39e8, 0 0 40px #00f0ff66; opacity:0; transition:opacity .12s; pointer-events:none; z-index:4}
+  #judgeText{position:absolute;left:50%;top:47%;transform:translate(-50%,-50%);font-weight:700;font-size:18px;letter-spacing:.16em;text-transform:uppercase;opacity:0;transition:.12s;pointer-events:none;z-index:4;text-shadow:0 0 12px currentColor}
+  #topNote{position:absolute;top:14px;left:50%;transform:translateX(-50%);font-size:11px;letter-spacing:.14em;color:#5f8aa8;z-index:6;display:none;text-transform:uppercase; text-align:center; max-width:90vw}
+  #holdToast{position:absolute;left:50%;top:57%;transform:translateX(-50%);font-size:12px;letter-spacing:.14em;color:#ffc8ff;text-shadow:0 0 10px #ff66ff99;opacity:0;transition:.15s;pointer-events:none;z-index:4}
+  #bpmBadge{position:absolute;top:14px;right:18px; font-size:11px; color:#6bcfe8; letter-spacing:.1em; z-index:6; display:none; background:#06172ecc; padding:6px 10px; border-radius:9px; border:1px solid #1d3a5a}
+  /* bottom */
+  #bottomBar{position:absolute;bottom:0;left:0;right:0;display:none;justify-content:center;gap:0;z-index:5;pointer-events:none}
+  .lane-key{width:25vw;max-width:170px;text-align:center;padding:11px 0 15px;font-family:'Orbitron',sans-serif;font-size:18px;color:#79d7ff;background:linear-gradient(180deg,transparent,#04132a55);border-top:1px solid #14315666;transition:.07s;position:relative}
+  .lane-key.active{color:#fff;background:#00d0ff22; text-shadow:0 0 12px #6ef}
+  .lane-key.holding{color:#fff; background:#b14bff22; border-top-color:#c774ff; text-shadow:0 0 14px #ff89ff}
+  .lane-key .holdbar{position:absolute;left:18%;right:18%;bottom:6px;height:3px;background:#17385d;border-radius:2px;overflow:hidden}
+  .lane-key .holdbar i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#6efaff,#d66fff);box-shadow:0 0 8px #8ef}
+  /* result */
+  .result-card{width:min(640px,92vw); text-align:center}
+  .result-score{font-family:'Orbitron',sans-serif; font-size:48px; color:#9effff; text-shadow:0 0 20px #00f0ff99; margin:10px 0}
+  .result-grid{display:grid;grid-template-columns:1fr 1fr 1fr; gap:10px; margin:18px 0; text-align:left}
+  @media(max-width:560px){.result-grid{grid-template-columns:1fr 1fr}}
+  .result-item{background:#0a1530; border:1px solid #1a2f52; border-radius:12px; padding:12px 14px; font-size:13px}
+  .result-item b{display:block; font-family:'Orbitron',sans-serif; font-size:20px; color:#eaffff; margin-top:3px}
+  .ghost{color:#5d819d; font-size:12px; margin-top:10px}
+  #trackName{margin-top:10px; font-size:12px; color:#5da6c8; min-height:18px; word-break:break-all}
+  .small-tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:#5a89a6}
+  .tag{border:1px solid #234464; padding:3px 8px; border-radius:999px; background:#0b1a31}
+  .bpm-tag{background:#0e2a3a; border-color:#1b6a88; color:#7efaff}
+  /* Calibration screen */
+  #calibrationScreen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(3,5,12,0.94);backdrop-filter:blur(10px);z-index:11;}
+  .cal-panel{width:min(680px,95vw);background:linear-gradient(180deg,#0b1124aa,#070a18cc);border:1px solid #1d2a4a;border-radius:18px;padding:26px;box-shadow:0 0 40px #0066ff18 inset,0 10px 50px #0008;}
+  .cal-title{font-family:'Orbitron',sans-serif;font-size:22px;color:#7efaff;letter-spacing:.08em;margin-bottom:6px;text-shadow:0 0 14px #00e5ff77;}
+  .cal-desc{color:#7aa3b8;font-size:12px;line-height:1.6;margin-bottom:16px}
+  #calMetroBox{position:relative;width:180px;height:180px;margin:14px auto;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;}
+  #calMetroRing{position:absolute;left:50%;top:50%;width:120px;height:120px;border-radius:50%;border:2px solid #7efaff;box-shadow:0 0 22px #00eaff88,inset 0 0 22px #00eaff33;transform:translate(-50%,-50%) scale(1);opacity:.5;transition:transform .09s,opacity .18s;}
+  #calTapPulse{position:absolute;left:50%;top:50%;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,#ff9dff88 0%,transparent 70%);transform:translate(-50%,-50%);opacity:0;pointer-events:none;}
+  #calTapZone{position:absolute;inset:0;border-radius:50%;}
+  .cal-tap-label{position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);font-size:11px;color:#8ecae0;letter-spacing:.14em;text-transform:uppercase;}
+  #calStatus{text-align:center;color:#aee9ff;font-size:14px;margin:12px 0 4px;min-height:20px;}
+  #calResult{text-align:center;color:#cfefff;font-size:13px;line-height:1.6;min-height:36px;margin:6px 0 12px;}
+  #calSuggestedOffset{text-align:center;color:#5a89a6;font-size:11px;letter-spacing:.06em;margin-bottom:8px;}
+  .cal-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
+  .cal-btn{flex:1;min-width:130px;padding:10px 12px;border:1px solid #2a3c66;background:#0d1630;color:#bfefff;border-radius:10px;font-family:'JetBrains Mono',monospace;font-weight:700;cursor:pointer;letter-spacing:.06em;font-size:12px;text-transform:uppercase;transition:.15s;}
+  .cal-btn:hover{border-color:#51f0ff;background:#0e2248;box-shadow:0 0 14px #00e5ff33;}
+  .cal-btn:disabled{opacity:.4;cursor:not-allowed;}
+  .cal-btn.primary{background:linear-gradient(90deg,#00f0ff,#7b61ff);color:#02121a;border-color:transparent;}
+  .cal-manual{margin-top:18px;padding-top:16px;border-top:1px solid #1a2a48;}
+  .cal-manual-title{font-size:11px;color:#6a8fb0;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;}
+  .cal-slider-row{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:12px;color:#aee9ff;}
+  .cal-slider-row label{flex:0 0 130px;color:#8ecae0;}
+  .cal-slider-row input[type=range]{flex:1;accent-color:#00e5ff;}
+  .cal-slider-row .val{flex:0 0 60px;text-align:right;color:#eaffff;font-weight:700;}
+  .cal-slider-row select{background:#0a1a34;color:#bfefff;border:1px solid #254567;border-radius:7px;padding:4px 8px;font-family:'JetBrains Mono',monospace;font-size:12px;}
+  #openCalibrationBtn{background:transparent;border:1px solid #2a3c66;color:#7aa9c6;padding:6px 12px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:.08em;text-transform:uppercase;transition:.15s;margin-top:10px;}
+  #openCalibrationBtn:hover{border-color:#51f0ff;color:#dfffff;box-shadow:0 0 12px #00e5ff33;}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="comboText"></div>
+<div id="judgeText"></div>
+<div id="holdToast">HOLD!</div>
+<div id="topNote"></div>
+<div id="bpmBadge"></div>
+
+<div id="hud">
+  <div id="hudLeft">
+    <div class="hud-pill">SCORE <span class="hud-big" id="scoreEl" style="margin-left:8px">0</span></div>
+    <div class="hud-pill">ACC <span id="accEl">100%</span> • <span id="hitsEl">0 / 0</span></div>
+  </div>
+  <div id="hudRight" style="text-align:right">
+    <div class="hud-pill">COMBO <span class="hud-big" id="comboEl" style="margin-left:6px">0</span></div>
+    <div class="hud-pill"><span id="modeEl">DRUMS</span> • <span id="bpmEl">-- BPM</span> • <span id="holdCountEl">HOLD 0</span></div>
+  </div>
+</div>
+
+<div id="bottomBar">
+  <div class="lane-key" id="lk0">D<div class="holdbar"><i></i></div></div>
+  <div class="lane-key" id="lk1">F<div class="holdbar"><i></i></div></div>
+  <div class="lane-key" id="lk2">J<div class="holdbar"><i></i></div></div>
+  <div class="lane-key" id="lk3">K<div class="holdbar"><i></i></div></div>
+</div>
+
+<div id="menu">
+  <h1>RHYTHM SHOOTER</h1>
+  <div class="subtitle">neon tiles • shoot the beat • v1.1 BPM AUTO</div>
+  <div class="panel">
+    <div class="dropzone" id="dropzone">
+      <strong>Перетащи свой трек сюда</strong><br>или кликни чтобы выбрать MP3 / WAV / OGG / FLAC
+      <input type="file" id="fileInput" accept="audio/*">
+      <div id="trackName"></div>
+      <div class="small-tags">
+        <div class="tag">Авто beatmap</div>
+        <div class="tag">HOLD NOTES</div>
+        <div class="tag bpm-tag" id="detectedBpmTag" style="display:none">-- BPM</div>
+        <div class="tag">D F J K / tap & hold</div>
+        <div class="tag">offline анализ</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="modes" style="flex:1">
+        <button class="mode-btn active" data-mode="drums">DRUMS<small>ударные • 50–220 Hz</small></button>
+        <button class="mode-btn" data-mode="classic">CLASSIC<small>full • holds вкл</small></button>
+        <button class="mode-btn" data-mode="vocal">VOCAL<small>вокал • long holds</small></button>
+      </div>
+    </div>
+
+    <div class="sliders">
+      <div class="slider-box">
+        <label>Чувствительность <span id="sensVal">1.25σ</span></label>
+        <input type="range" id="sens" min="0.5" max="2.5" step="0.05" value="1.25">
+      </div>
+      <div class="slider-box">
+        <label>Скорость падения <span id="fallVal">Авто BPM</span></label>
+        <input type="range" id="fallSpeed" min="0.85" max="2.4" step="0.05" value="1.45">
+        <small id="fallHint" style="color:#5a8dad;font-size:10px">Авто под BPM, можно отключить ниже</small>
+      </div>
+      <div class="slider-box">
+        <label>Длинные ноты <span id="holdVal">Авто</span></label>
+        <input type="range" id="holdAmt" min="0" max="2" step="1" value="1">
+      </div>
+    </div>
+
+    <div class="toggle-row">
+      <label><input type="checkbox" id="bpmAuto" checked> <b>Авто BPM</b> — синхронизировать скорость</label>
+      <label>Подлёт:
+        <select id="beatsLead">
+          <option value="2.5">Slow 2.5 beats</option>
+          <option value="2.0" selected>Normal 2.0 beats</option>
+          <option value="1.6">Fast 1.6 beats</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="holdEnable" checked> HOLD-ноты</label>
+      <label><input type="checkbox" id="dualEnable" checked> Аккорды</label>
+      <label><input type="checkbox" id="autoLane" checked> Умная раскладка</label>
+    </div>
+
+    <button class="play-btn" id="playBtn" disabled>Сначала загрузи трек</button>
+    <div style="text-align:center"><button id="openCalibrationBtn">⚙ Калибровка задержки</button></div>
+    <div class="hint">
+      <b>v1.1 BPM AUTO:</b> теперь игра детектит BPM трека и подстраивает скорость падения.<br>
+      Медленный трек 82 BPM → ~1.47s полёт, быстрый 168 BPM → ~0.95s. Можно отключить “Авто BPM” и ставить руками.<br>
+      Управление: <span class="keycaps"><span>D</span><span>F</span><span>J</span><span>K</span></span> tap / hold • ESC выход.
+    </div>
+  </div>
+  <div class="ghost">v1.1 bpm • Auto tempo sync • WebAudio Offline • 2026-07-10</div>
+</div>
+
+<div id="result">
+  <div class="panel result-card">
+    <div class="subtitle">MISSION COMPLETE</div>
+    <div class="result-score" id="finalScore">0</div>
+    <div class="result-grid">
+      <div class="result-item">Точность<b id="finalAcc">0%</b></div>
+      <div class="result-item">Макс комбо<b id="finalCombo">0</b></div>
+      <div class="result-item">BPM<b id="finalBpm">--</b></div>
+      <div class="result-item">PERFECT<b id="finalPerfect">0</b></div>
+      <div class="result-item">GOOD<b id="finalGood">0</b></div>
+      <div class="result-item">HOLDS<b id="finalHolds">0/0</b></div>
+      <div class="result-item">MISS<b id="finalMiss">0</b></div>
+      <div class="result-item">Скорость<b id="finalSpeed">--</b></div>
+      <div class="result-item">Score<b id="finalScore2">0</b></div>
+    </div>
+    <div style="margin-top:14px">
+      <div style="font-size:10px;color:#5a89a6;letter-spacing:.14em;text-transform:uppercase;text-align:center;margin-bottom:6px">Гистограмма попаданий</div>
+      <canvas id="hitChart" width="580" height="120" style="width:100%;max-width:580px;height:120px;background:#050b1a;border:1px solid #1a2f52;border-radius:10px;"></canvas>
+    </div>
+    <button class="play-btn" id="againBtn" style="margin-top:14px">Сыграть снова</button>
+    <div class="ghost" style="margin-top:12px">BPM автосинхронизация включена. Меняй “Подлёт” Slow/Normal/Fast для комфорта.</div>
+  </div>
+</div>
+
+<div id="calibrationScreen">
+  <div class="cal-panel">
+    <div class="cal-title">КАЛИБРОВКА ЗАДЕРЖКИ</div>
+    <div class="cal-desc">
+      Твоё железо (Bluetooth-наушники, USB-DAC, монитор) вносит задержку между тем, как ты слышишь бит, и тем, как игра его засчитывает.
+      Тапай <b>Space</b> или кликай по кругу в такт бипам — игра посчитает медианный оффсет и разброс.
+    </div>
+    <div id="calMetroBox">
+      <div id="calMetroRing"></div>
+      <div id="calTapPulse"></div>
+      <div id="calTapZone"></div>
+      <div class="cal-tap-label">SPACE / CLICK</div>
+    </div>
+    <div id="calStatus">Нажми «Старт» и тапай на каждый высокий бип</div>
+    <div id="calResult"></div>
+    <div id="calSuggestedOffset"></div>
+    <div class="cal-row">
+      <button class="cal-btn primary" id="calibrationStartBtn">▶ Старт (12 тапов)</button>
+      <button class="cal-btn" id="calibrationApplyBtn" disabled>Применить</button>
+      <button class="cal-btn" id="calibrationResetBtn">Сброс</button>
+    </div>
+
+    <div class="cal-manual">
+      <div class="cal-manual-title">Ручная настройка</div>
+      <div class="cal-slider-row">
+        <label>Audio offset</label>
+        <input type="range" id="audioOffsetSlider" min="-300" max="300" step="1" value="0">
+        <span class="val" id="audioOffsetVal">0 ms</span>
+      </div>
+      <div class="cal-slider-row">
+        <label>Visual offset</label>
+        <input type="range" id="visualOffsetSlider" min="-200" max="200" step="1" value="0">
+        <span class="val" id="visualOffsetVal">0 ms</span>
+      </div>
+      <div class="cal-slider-row">
+        <label>Строгость</label>
+        <select id="judgeModeSelect">
+          <option value="lenient">Мягкие окна (для новичков)</option>
+          <option value="normal" selected>Нормальные окна</option>
+          <option value="strict">Строгие окна</option>
+          <option value="insane">Безумные окна (осу-стайл)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="cal-row" style="margin-top:14px">
+      <button class="cal-btn" id="calibrationCloseBtn">← Назад в меню</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
