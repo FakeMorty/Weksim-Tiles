@@ -3,8 +3,13 @@
 import { state } from '../game/state.js';
 import { analyzeTrack } from '../audio/analyzer.js';
 import { startPlay } from '../game/loop.js';
+import { APP_VERSION } from '../config.js';
 
 export function bindMenu() {
+  const subtitleEl = document.getElementById('menuSubtitle');
+  if (subtitleEl) {
+    subtitleEl.innerHTML = 'neon tiles \u2022 shoot the beat \u2022 <b>v' + APP_VERSION + '</b>';
+  }
   document.querySelectorAll('.mode-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));

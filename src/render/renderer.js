@@ -1,34 +1,57 @@
-// Main renderer with camera transform, lane/hit-line flashes, chromatic
-// aberration on high combos, batched particle rendering.
+// Main renderer. Optimised for weak GPUs: cached gradients, DPR downscaling,
+// simplified draw calls on low FX, note cursor for O(k) visibility scan.
 
 import { state } from '../game/state.js';
 import { view, laneMetrics, hitY, roundRect } from '../utils/canvas.js';
 import { drawHead, drawHoldCap } from './notes.js';
-import { LANES } from '../config.js';
+import { LANES, APP_VERSION } from '../config.js';
 import { camera, updateCamera, applyCameraTransform } from './camera.js';
 import { getFlashState, updateFlashes } from '../fx/flash.js';
 import { updateAndRenderParticles } from '../fx/particles.js';
-import { fxHigh, fxLow } from '../game/settings.js';
+import { fxHigh, fxLow, fxMedium } from '../game/settings.js';
+import { perf, tickPerf } from '../utils/perf.js';
+
+// Cache expensive per-lane gradients — recomputed only when H changes.
+let laneGradCache = null;
+let laneGradH = 0;
+function getLaneGrad(ctx, x, H) {
+  if (laneGradCache && laneGradH === H) {
+    return laneGradCache;
+  }
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, 'rgba(8,18,42,0.22)');
+  g.addColorStop(1, 'rgba(10,24,54,0.52)');
+  laneGradCache = g;
+  laneGradH = H;
+  return g;
+}
+export function invalidateGradCache() {
+  laneGradCache = null;
+}
 
 export function render(t, dt) {
   const { ctx, W, H } = view;
   const flash = getFlashState();
   updateCamera(dt);
   updateFlashes(dt);
+  if (state.gameRunning && !state.paused) tickPerf(dt);
 
   ctx.clearRect(0, 0, W, H);
 
-  // Draw background grid (outside camera transform so it stays fixed = subtle parallax feel)
-  ctx.save(); ctx.globalAlpha = 0.07;
-  for (let y = 0; y < H; y += 46) { ctx.fillStyle = '#0c1c3a'; ctx.fillRect(0, y, W, 1); }
-  ctx.restore();
+  // Background grid — cheap, but skipped entirely on low FX to save 40+ fillRects.
+  if (!fxLow()) {
+    ctx.save(); ctx.globalAlpha = 0.07;
+    ctx.fillStyle = '#0c1c3a';
+    for (let y = 0; y < H; y += 46) ctx.fillRect(0, y, W, 1);
+    ctx.restore();
+  }
 
-  // Chromatic aberration only on 'high' quality — it triples render cost.
+  // Chromatic aberration only on 'high' quality — triples render cost.
   const ab = flash.aberration;
   if (ab > 0.02 && fxHigh()) {
     renderScene(ctx, t, dt, -ab * 4, 0, 'rgba(255,60,120,0.7)');
     renderScene(ctx, t, dt,  ab * 4, 0, 'rgba(60,220,255,0.7)');
-    renderScene(ctx, t, dt, 0, 0, null); // main pass on top
+    renderScene(ctx, t, dt, 0, 0, null);
   } else {
     renderScene(ctx, t, dt, 0, 0, null);
   }
@@ -41,11 +64,38 @@ export function render(t, dt) {
     ctx.fillRect(0, 0, W, H);
     ctx.restore();
   }
+
+  // Version + FPS in corner
+  drawOverlayInfo(ctx);
+}
+
+function drawOverlayInfo(ctx) {
+  const { W, H } = view;
+  ctx.save();
+  ctx.font = 'bold 10px "JetBrains Mono", monospace';
+  ctx.textBaseline = 'bottom';
+  ctx.textAlign = 'right';
+  ctx.fillStyle = 'rgba(120,200,240,0.55)';
+  // Version bottom-right
+  ctx.fillText('v' + APP_VERSION, W - 8, H - 6);
+  // FPS bottom-left (only during gameplay)
+  if (state.gameRunning) {
+    const fps = perf.fps || 60;
+    const color = fps >= 55 ? 'rgba(120,255,180,0.75)'
+               : fps >= 40 ? 'rgba(255,230,120,0.85)'
+               : 'rgba(255,110,140,0.95)';
+    ctx.fillStyle = color;
+    ctx.textAlign = 'left';
+    ctx.fillText(fps + ' FPS', 8, H - 6);
+  }
+  ctx.restore();
 }
 
 function renderScene(ctx, t, dt, shiftX, shiftY, tint) {
   const { W, H } = view;
   const flash = getFlashState();
+  const highFx = fxHigh();
+  const lowFx = fxLow();
 
   ctx.save();
   applyCameraTransform(ctx, W, H);
@@ -57,18 +107,16 @@ function renderScene(ctx, t, dt, shiftX, shiftY, tint) {
 
   const { playW, left, lw } = laneMetrics();
   const hy = hitY();
+  const grad = getLaneGrad(ctx, 0, H);
 
-  // Lanes
+  // Lanes background + borders + auto-fire beam
   for (let i = 0; i < LANES; i++) {
     const x = left + i * lw;
-    const grad = ctx.createLinearGradient(x, 0, x, H);
-    grad.addColorStop(0, 'rgba(8,18,42,0.22)');
-    grad.addColorStop(1, 'rgba(10,24,54,0.52)');
     ctx.fillStyle = grad;
     ctx.fillRect(x + 1, 0, lw - 2, H);
 
-    // Auto-fire beam
-    if (state.beams[i] > 0.05) {
+    // Auto-fire beam — skip on low FX (it's cosmetic)
+    if (state.beams[i] > 0.05 && !lowFx) {
       ctx.save();
       ctx.globalAlpha = 0.13 + state.beams[i] * 0.26;
       const bx = x + lw / 2;
@@ -80,7 +128,6 @@ function renderScene(ctx, t, dt, shiftX, shiftY, tint) {
       ctx.restore();
     }
 
-    // Lane border + hit flash tint
     const laneFlashV = flash.laneFlash[i];
     const laneFlashC = flash.laneFlashColor[i];
     if (laneFlashV > 0.02) {
@@ -104,11 +151,13 @@ function renderScene(ctx, t, dt, shiftX, shiftY, tint) {
 
   ctx.strokeStyle = '#2a5d88'; ctx.lineWidth = 1.4; ctx.strokeRect(left, 0, playW, H);
 
-  // Hit line (with flash-driven glow)
+  // Hit line — glow simplified on low FX
   const hitFlash = flash.hitLine;
   ctx.save();
-  ctx.shadowColor = hitFlash > 0.05 ? flash.hitLineColor : '#00f0ff';
-  ctx.shadowBlur = 20 + hitFlash * 40;
+  if (!lowFx) {
+    ctx.shadowColor = hitFlash > 0.05 ? flash.hitLineColor : '#00f0ff';
+    ctx.shadowBlur = 20 + hitFlash * 40;
+  }
   ctx.strokeStyle = hitFlash > 0.05 ? flash.hitLineColor : '#9ffaff';
   ctx.lineWidth = 2.6 + hitFlash * 2.5;
   ctx.beginPath(); ctx.moveTo(left, hy); ctx.lineTo(left + playW, hy); ctx.stroke();
@@ -120,9 +169,7 @@ function renderScene(ctx, t, dt, shiftX, shiftY, tint) {
   ctx.fillRect(left, hy - 36, playW, 56);
   ctx.restore();
 
-  // Notes: because state.notes is sorted by time (analyzer guarantees), we
-  // scan a narrow window instead of filtering the entire list every frame.
-  // This turns O(N) per frame into O(k) where k = notes on screen (~20).
+  // Notes: O(k) scan via cursor. state.notes is sorted by time.
   const winStart = t - 0.4;
   const winEnd   = t + state.fallTime + 0.25;
   const notes = state.notes;
@@ -149,25 +196,31 @@ function renderScene(ctx, t, dt, shiftX, shiftY, tint) {
       const topY = Math.min(yHead, yTail);
       const botY = Math.max(yHead, yTail);
       ctx.save();
-      ctx.shadowColor = n.holding ? '#ff9dff' : '#5eefff';
-      ctx.shadowBlur = n.holding ? 24 : 14;
-      // Tail gradient (Etap 7)
-      const tailGrad = ctx.createLinearGradient(x, topY, x, botY);
-      if (n.holding) {
-        tailGrad.addColorStop(0, 'rgba(210,120,255,0.55)');
-        tailGrad.addColorStop(1, 'rgba(255,180,255,0.15)');
-      } else {
-        tailGrad.addColorStop(0, 'rgba(60,220,255,0.35)');
-        tailGrad.addColorStop(1, 'rgba(60,220,255,0.10)');
+      if (!lowFx) {
+        ctx.shadowColor = n.holding ? '#ff9dff' : '#5eefff';
+        ctx.shadowBlur = n.holding ? 24 : 14;
       }
-      ctx.fillStyle = tailGrad;
-      roundRect(ctx, x - barW / 2, topY, barW, Math.max(28, botY - topY), 10);
-      ctx.fill();
+      if (lowFx) {
+        // Low: simple flat rect, no gradient, no rounding
+        ctx.fillStyle = n.holding ? 'rgba(210,120,255,0.45)' : 'rgba(60,220,255,0.28)';
+        ctx.fillRect(x - barW / 2, topY, barW, Math.max(28, botY - topY));
+      } else {
+        const tailGrad = ctx.createLinearGradient(x, topY, x, botY);
+        if (n.holding) {
+          tailGrad.addColorStop(0, 'rgba(210,120,255,0.55)');
+          tailGrad.addColorStop(1, 'rgba(255,180,255,0.15)');
+        } else {
+          tailGrad.addColorStop(0, 'rgba(60,220,255,0.35)');
+          tailGrad.addColorStop(1, 'rgba(60,220,255,0.10)');
+        }
+        ctx.fillStyle = tailGrad;
+        roundRect(ctx, x - barW / 2, topY, barW, Math.max(28, botY - topY), 10);
+        ctx.fill();
+      }
       ctx.shadowBlur = 0;
       ctx.fillStyle = n.holding ? '#f0c8ff' : '#9efbff';
       ctx.globalAlpha = 0.9;
-      roundRect(ctx, x - 3, topY, 6, Math.max(18, botY - topY), 3);
-      ctx.fill();
+      ctx.fillRect(x - 3, topY, 6, Math.max(18, botY - topY));
       ctx.globalAlpha = 1;
       ctx.restore();
 
@@ -177,16 +230,15 @@ function renderScene(ctx, t, dt, shiftX, shiftY, tint) {
         ctx.save();
         ctx.globalAlpha = 0.48;
         ctx.fillStyle = '#ffffff';
-        roundRect(ctx, x - barW / 2 + 2, botY - fillH, barW - 4, fillH, 8);
-        ctx.fill();
+        ctx.fillRect(x - barW / 2 + 2, botY - fillH, barW - 4, fillH);
         ctx.restore();
       }
       drawHoldCap(ctx, x, yTail, n.lane, true, n.holding);
     }
 
     const size = n.isHold ? 34 : 30 + Math.min(9, progressHead * 6);
-    // Approach ring
-    if (timeToHead > 0 && timeToHead < 0.48) {
+    // Approach ring — highFx only (it's 1 extra path per note per frame)
+    if (highFx && timeToHead > 0 && timeToHead < 0.48) {
       const approach = timeToHead / 0.48;
       ctx.save();
       ctx.globalAlpha = 0.16 + (1 - approach) * 0.22;
@@ -204,9 +256,11 @@ function renderScene(ctx, t, dt, shiftX, shiftY, tint) {
     b.y += b.vy * dt;
     b.life -= dt;
     ctx.save();
-    ctx.shadowColor = b.hold ? '#ffb5ff' : '#aefaff';
-    ctx.shadowBlur  = b.hold ? 18 : 13;
-    ctx.fillStyle   = b.hold ? '#ffe9ff' : '#eaffff';
+    if (!lowFx) {
+      ctx.shadowColor = b.hold ? '#ffb5ff' : '#aefaff';
+      ctx.shadowBlur  = b.hold ? 18 : 13;
+    }
+    ctx.fillStyle = b.hold ? '#ffe9ff' : '#eaffff';
     ctx.beginPath(); ctx.arc(left + b.lane * lw + lw / 2, b.y, b.hold ? 5.2 : 4.3, 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 0.3;
@@ -215,39 +269,44 @@ function renderScene(ctx, t, dt, shiftX, shiftY, tint) {
     if (b.life <= 0 || b.y < -30) state.bullets.splice(i, 1);
   }
 
-  // Particles (batched pool, Etap 7)
   updateAndRenderParticles(ctx, dt);
 
-  // Lane bases / turrets
+  // Turrets
   for (let i = 0; i < LANES; i++) {
     const cx = left + i * lw + lw / 2;
     const cy = hy + 35;
     ctx.save();
     const isBeam = state.beams[i] > 0.15;
     const laneF = flash.laneFlash[i];
-    ctx.shadowColor = laneF > 0.2 ? flash.laneFlashColor[i]
-      : (isBeam ? '#ff9dff' : (state.flashes[i] > 0 ? '#ffffff' : '#00c8ff'));
-    ctx.shadowBlur = laneF > 0.2 ? 24 + laneF * 20
-      : (isBeam ? 26 : (state.flashes[i] > 0 ? 22 : 10));
+    if (!lowFx) {
+      ctx.shadowColor = laneF > 0.2 ? flash.laneFlashColor[i]
+        : (isBeam ? '#ff9dff' : (state.flashes[i] > 0 ? '#ffffff' : '#00c8ff'));
+      ctx.shadowBlur = laneF > 0.2 ? 24 + laneF * 20
+        : (isBeam ? 26 : (state.flashes[i] > 0 ? 22 : 10));
+    }
     ctx.fillStyle   = isBeam ? '#2a0f3a' : '#081d34';
     ctx.strokeStyle = laneF > 0.2 ? flash.laneFlashColor[i] : (isBeam ? '#ffb8ff' : '#4fd8ff');
     ctx.lineWidth = 2 + laneF * 1.5;
-    roundRect(ctx, cx - 30, cy - 16, 60, 20, 7); ctx.fill(); ctx.stroke();
+    if (lowFx) {
+      ctx.fillRect(cx - 30, cy - 16, 60, 20);
+      ctx.strokeRect(cx - 30, cy - 16, 60, 20);
+    } else {
+      roundRect(ctx, cx - 30, cy - 16, 60, 20, 7); ctx.fill(); ctx.stroke();
+    }
     ctx.fillStyle = isBeam ? '#4a1a66' : '#0f2d52';
     ctx.fillRect(cx - 6, hy + 2, 12, 34);
     if (isBeam) {
-      ctx.shadowColor = '#ff9dff'; ctx.shadowBlur = 18;
+      if (!lowFx) { ctx.shadowColor = '#ff9dff'; ctx.shadowBlur = 18; }
       ctx.fillStyle = '#ffeaff';
       ctx.beginPath(); ctx.arc(cx, hy + 1, 5, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
   }
 
-  ctx.restore(); // camera transform
+  ctx.restore();
 }
 
 function hexToRgba(hex, alpha) {
-  // Accept #rrggbb, #rgb, or already-formatted rgba
   if (hex.startsWith('rgba') || hex.startsWith('rgb')) return hex;
   let h = hex.replace('#', '');
   if (h.length === 3) h = h.split('').map(c => c + c).join('');

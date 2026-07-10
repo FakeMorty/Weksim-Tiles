@@ -12,6 +12,7 @@ import { drawHitChart } from '../ui/hitChart.js';
 import { resetCamera, shake } from '../render/camera.js';
 import { resetFlashes, flashScreen } from '../fx/flash.js';
 import { settings } from './settings.js';
+import { resetPerf, summarisePerf } from '../utils/perf.js';
 
 let lastFrame = performance.now();
 
@@ -21,6 +22,7 @@ export function startPlay() {
   resetParticles();
   resetCamera();
   resetFlashes();
+  resetPerf();
   state.gameRunning = true;
   state.paused = false;
   state.pauseOffset = 0;
@@ -133,6 +135,16 @@ export function endGame() {
   document.getElementById('finalMiss').textContent = state.misses;
   document.getElementById('finalBpm').textContent = state.currentBpm ? Math.round(state.currentBpm) : '--';
   document.getElementById('finalSpeed').textContent = state.fallTime.toFixed(2) + 's';
+  const fpsSummary = summarisePerf();
+  const fpsEl = document.getElementById('finalFps');
+  if (fpsEl) {
+    fpsEl.textContent = fpsSummary.avg + ' / ' + fpsSummary.p1 + ' / ' + fpsSummary.min;
+    fpsEl.title = 'average / 1% low / minimum FPS during play';
+    // Colour code
+    fpsEl.style.color = fpsSummary.avg >= 55 ? '#7dfffa'
+                     : fpsSummary.avg >= 40 ? '#ffd86a'
+                     : '#ff6a7a';
+  }
   document.getElementById('result').style.display = 'flex';
   // Etap 5: draw hit-offset histogram
   setTimeout(() => drawHitChart(document.getElementById('hitChart')), 30);

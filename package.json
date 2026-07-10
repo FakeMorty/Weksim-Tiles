@@ -1,6 +1,6 @@
 {
   "name": "rhythm-shooter-neon",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Rhythm Shooter - neon piano tiles shooter. STFT + multiband flux, Web Worker analysis, HOLD notes, calibration.",
   "main": "main.cjs",
   "type": "module",

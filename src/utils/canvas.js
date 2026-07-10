@@ -1,6 +1,7 @@
 // Canvas + viewport helpers.
 
 import { RENDER } from '../config.js';
+import { fxLow } from '../game/settings.js';
 
 export const view = {
   canvas: null,
@@ -12,9 +13,17 @@ export const view = {
 
 export function initCanvas(canvasEl) {
   view.canvas = canvasEl;
-  view.ctx = canvasEl.getContext('2d');
+  view.ctx = canvasEl.getContext('2d', { alpha: true, desynchronized: true });
   resize();
   window.addEventListener('resize', resize);
+}
+
+// Recompute DPR — useful when user switches FX quality mid-menu.
+export function refreshDPR() {
+  // On low FX force DPR=1 — a 1920×1080 canvas at DPR=2 is 8.3 MP per frame,
+  // which is >4× the fillRate an integrated GPU can push at 60fps.
+  view.DPR = fxLow() ? 1 : Math.min(window.devicePixelRatio || 1, RENDER.DPR_MAX);
+  resize();
 }
 
 export function resize() {

@@ -47,9 +47,10 @@ globalThis.localStorage = {
 
 const modules = [
   'src/config.js',
-  'src/utils/canvas.js',
-  'src/game/state.js',
   'src/game/settings.js',
+  'src/utils/canvas.js',
+  'src/utils/perf.js',
+  'src/game/state.js',
   'src/game/calibration.js',
   'src/audio/stft.js',
   'src/audio/spectralFlux.js',

@@ -17,9 +17,14 @@ export function bindPause() {
   const fxSel = document.getElementById('fxQualitySelect');
   if (fxSel) {
     fxSel.value = settings.fxQuality;
-    fxSel.addEventListener('change', () => {
+    fxSel.addEventListener('change', async () => {
       settings.fxQuality = fxSel.value;
       saveSettings();
+      // Adjust canvas resolution — low FX drops to DPR=1
+      const { refreshDPR } = await import('../utils/canvas.js');
+      const { invalidateGradCache } = await import('../render/renderer.js');
+      refreshDPR();
+      invalidateGradCache();
     });
   }
 
