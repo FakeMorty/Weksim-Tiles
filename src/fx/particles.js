@@ -3,6 +3,7 @@
 
 import { state } from '../game/state.js';
 import { laneMetrics, hitY } from '../utils/canvas.js';
+import { fxLow, fxHigh } from '../game/settings.js';
 
 const MAX_PARTICLES = 500;
 
@@ -42,7 +43,9 @@ export function spawnHitParticles(lane, isHold, tier = 'PERFECT') {
     : bigTier
       ? ['#ffffff', '#7dfffa', '#c8fff8', '#eaffff']
       : ['#6ef6ff', '#8affc4', '#ffe17a', '#ff7adf'];
-  const count = isHold ? 22 : bigTier ? 22 : 14;
+  // Cut particle counts on low FX so weak GPUs breathe.
+  const scale = fxLow() ? 0.35 : (fxHigh() ? 1 : 0.65);
+  const count = Math.max(4, Math.floor((isHold ? 22 : bigTier ? 22 : 14) * scale));
   const baseSpeed = isHold ? 190 : bigTier ? 220 : 160;
   for (let i = 0; i < count; i++) {
     const p = acquire();
@@ -143,11 +146,14 @@ export function updateAndRenderParticles(ctx, dt) {
     arr.push(p);
   }
 
+  const useGlow = !fxLow();
   for (const [color, arr] of buckets) {
     ctx.save();
     ctx.fillStyle = color;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 8;
+    if (useGlow) {
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 8;
+    }
     for (const p of arr) {
       ctx.globalAlpha = p.alpha;
       ctx.beginPath();

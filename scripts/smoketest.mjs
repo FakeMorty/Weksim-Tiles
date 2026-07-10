@@ -49,6 +49,7 @@ const modules = [
   'src/config.js',
   'src/utils/canvas.js',
   'src/game/state.js',
+  'src/game/settings.js',
   'src/game/calibration.js',
   'src/audio/stft.js',
   'src/audio/spectralFlux.js',
@@ -68,6 +69,7 @@ const modules = [
   'src/game/judge.js',
   'src/game/loop.js',
   'src/game/input.js',
+  'src/ui/pause.js',
   'src/ui/menu.js',
   'src/main.js',
 ];

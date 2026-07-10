@@ -11,6 +11,7 @@ import { judgeMultiplier } from './calibration.js';
 import { drawHitChart } from '../ui/hitChart.js';
 import { resetCamera, shake } from '../render/camera.js';
 import { resetFlashes, flashScreen } from '../fx/flash.js';
+import { settings } from './settings.js';
 
 let lastFrame = performance.now();
 
@@ -21,9 +22,12 @@ export function startPlay() {
   resetCamera();
   resetFlashes();
   state.gameRunning = true;
+  state.paused = false;
+  state.pauseOffset = 0;
 
   document.getElementById('menu').style.display = 'none';
   document.getElementById('result').style.display = 'none';
+  document.getElementById('pauseScreen').style.display = 'none';
   document.getElementById('hud').style.display = 'flex';
   document.getElementById('bottomBar').style.display = 'flex';
   document.getElementById('modeEl').textContent = state.mode.toUpperCase();
@@ -35,16 +39,81 @@ export function startPlay() {
 
   if (state.audioCtx.state === 'suspended') state.audioCtx.resume();
   if (state.sourceNode) { try { state.sourceNode.stop(); } catch {} }
+
+  // Gain node so we can control master volume live
+  if (!state.gainNode) {
+    state.gainNode = state.audioCtx.createGain();
+    state.gainNode.connect(state.audioCtx.destination);
+  }
+  state.gainNode.gain.value = settings.volume;
+
   state.sourceNode = state.audioCtx.createBufferSource();
   state.sourceNode.buffer = state.audioBuffer;
-  state.sourceNode.connect(state.audioCtx.destination);
+  state.sourceNode.connect(state.gainNode);
   const startAt = state.audioCtx.currentTime + 0.18;
   state.sourceNode.start(startAt);
   state.startTime = startAt;
-  state.sourceNode.onended = () => { if (state.gameRunning) endGame(); };
+  state.sourceNode.onended = () => { if (state.gameRunning && !state.paused) endGame(); };
 
   lastFrame = performance.now();
   requestAnimationFrame(loop);
+}
+
+// Pause / resume are best-effort. Web Audio does not support "pause" on a
+// BufferSourceNode — we suspend the whole context, which halts currentTime.
+export async function pauseGame() {
+  if (!state.gameRunning || state.paused) return;
+  state.paused = true;
+  state.pauseStart = state.audioCtx.currentTime;
+  try { await state.audioCtx.suspend(); } catch {}
+  document.getElementById('pauseScreen').style.display = 'flex';
+}
+
+export async function resumeGame() {
+  if (!state.gameRunning || !state.paused) return;
+  try { await state.audioCtx.resume(); } catch {}
+  // Any time spent paused shouldn't shift the song clock — because currentTime
+  // freezes while suspended, songTime() naturally stays consistent. But if the
+  // browser drifted slightly, we track the offset for logging.
+  state.pauseOffset += state.audioCtx.currentTime - state.pauseStart;
+  state.paused = false;
+  document.getElementById('pauseScreen').style.display = 'none';
+  lastFrame = performance.now();
+  requestAnimationFrame(loop);
+}
+
+export function restartCurrent() {
+  if (!state.audioBuffer) return;
+  // Stop current source cleanly
+  try { state.sourceNode?.stop(); } catch {}
+  state.sourceNode = null;
+  state.paused = false;
+  // Un-judge all notes so they replay
+  for (const n of state.notes) {
+    n.judged = false;
+    n.holding = false;
+    n.holdProgress = 0;
+  }
+  if (state.audioCtx.state === 'suspended') state.audioCtx.resume();
+  startPlay();
+}
+
+export function exitToMenu() {
+  if (state.sourceNode) { try { state.sourceNode.stop(); } catch {} }
+  state.sourceNode = null;
+  state.gameRunning = false;
+  state.paused = false;
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('bottomBar').style.display = 'none';
+  document.getElementById('bpmBadge').style.display = 'none';
+  document.getElementById('pauseScreen').style.display = 'none';
+  document.getElementById('result').style.display = 'none';
+  document.getElementById('menu').style.display = 'flex';
+}
+
+export function setVolume(v) {
+  settings.volume = Math.max(0, Math.min(1, v));
+  if (state.gainNode) state.gainNode.gain.value = settings.volume;
 }
 
 export function endGame() {
@@ -71,6 +140,13 @@ export function endGame() {
 
 function loop(now) {
   if (!state.gameRunning) return;
+  if (state.paused) {
+    // Keep RAF idle so we can render the frozen frame beneath the pause UI.
+    render(renderTime(), 0);
+    lastFrame = now;
+    requestAnimationFrame(loop);
+    return;
+  }
   // Cap dt at ~33ms so that a hitched frame doesn't teleport bullets / particles.
   const dt = Math.min(0.033, (now - lastFrame) / 1000); lastFrame = now;
   const tJudge = judgeTime();    // for hit-timing checks

@@ -97,6 +97,21 @@
   .cal-slider-row select{background:#0a1a34;color:#bfefff;border:1px solid #254567;border-radius:7px;padding:4px 8px;font-family:'JetBrains Mono',monospace;font-size:12px;}
   #openCalibrationBtn{background:transparent;border:1px solid #2a3c66;color:#7aa9c6;padding:6px 12px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:.08em;text-transform:uppercase;transition:.15s;margin-top:10px;}
   #openCalibrationBtn:hover{border-color:#51f0ff;color:#dfffff;box-shadow:0 0 12px #00e5ff33;}
+  /* Pause screen */
+  #pauseScreen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(3,5,12,0.82);backdrop-filter:blur(8px);z-index:12;}
+  .pause-panel{width:min(420px,92vw);background:linear-gradient(180deg,#0b1124ee,#070a18ee);border:1px solid #1d2a4a;border-radius:18px;padding:28px 26px;box-shadow:0 0 40px #0066ff22 inset,0 10px 50px #000c;text-align:center;}
+  .pause-title{font-family:'Orbitron',sans-serif;font-size:26px;color:#7efaff;letter-spacing:.16em;margin-bottom:6px;text-shadow:0 0 16px #00e5ff88;}
+  .pause-sub{color:#7aa3b8;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:18px;}
+  .pause-btn{display:block;width:100%;padding:13px 16px;margin:8px 0;font-family:'Orbitron',sans-serif;font-size:14px;letter-spacing:.1em;text-transform:uppercase;border-radius:12px;border:1px solid #2a3c66;background:#0d1630;color:#bfefff;cursor:pointer;transition:.15s;}
+  .pause-btn:hover{border-color:#51f0ff;background:#0e2248;color:#dfffff;box-shadow:0 0 18px #00e5ff33;}
+  .pause-btn.primary{background:linear-gradient(90deg,#00f0ff,#7b61ff);color:#02121a;border-color:transparent;font-weight:700;}
+  .pause-btn.danger{color:#ff9db0;border-color:#5a2434;}
+  .pause-btn.danger:hover{background:#2a0f18;border-color:#ff5566;box-shadow:0 0 18px #ff556633;}
+  .pause-vol{display:flex;align-items:center;gap:10px;margin:18px 0 6px;padding:12px 14px;background:#0a1126;border:1px solid #1b2a4d;border-radius:12px;}
+  .pause-vol label{font-size:11px;color:#6a8fb0;letter-spacing:.1em;text-transform:uppercase;flex:0 0 auto;}
+  .pause-vol input[type=range]{flex:1;accent-color:#00e5ff;}
+  .pause-vol .val{font-weight:700;color:#eaffff;font-size:13px;min-width:44px;text-align:right;}
+  .pause-hint{color:#5d819d;font-size:11px;margin-top:14px;letter-spacing:.06em;}
 </style>
 </head>
 <body>
@@ -179,6 +194,21 @@
       <label><input type="checkbox" id="holdEnable" checked> HOLD-ноты</label>
       <label><input type="checkbox" id="dualEnable" checked> Аккорды</label>
       <label><input type="checkbox" id="autoLane" checked> Умная раскладка</label>
+    </div>
+
+    <div class="sliders" style="margin-top:14px">
+      <div class="slider-box">
+        <label>Громкость <span id="menuVolumeVal">55%</span></label>
+        <input type="range" id="menuVolume" min="0" max="100" step="1" value="55">
+      </div>
+      <div class="slider-box">
+        <label>Качество эффектов</label>
+        <select id="fxQualitySelect">
+          <option value="high">Высокое (bloom, aberration, все частицы)</option>
+          <option value="medium">Среднее (без aberration)</option>
+          <option value="low">Низкое (для слабых ПК)</option>
+        </select>
+      </div>
     </div>
 
     <button class="play-btn" id="playBtn" disabled>Сначала загрузи трек</button>
@@ -264,6 +294,22 @@
     <div class="cal-row" style="margin-top:14px">
       <button class="cal-btn" id="calibrationCloseBtn">← Назад в меню</button>
     </div>
+  </div>
+</div>
+
+<div id="pauseScreen">
+  <div class="pause-panel">
+    <div class="pause-title">ПАУЗА</div>
+    <div class="pause-sub">ESC — продолжить</div>
+    <div class="pause-vol">
+      <label>🔊 Громк.</label>
+      <input type="range" id="pauseVolume" min="0" max="100" step="1" value="55">
+      <span class="val" id="pauseVolumeVal">55%</span>
+    </div>
+    <button class="pause-btn primary" id="pauseContinueBtn">▶ Продолжить</button>
+    <button class="pause-btn" id="pauseRestartBtn">↻ Переиграть песню</button>
+    <button class="pause-btn danger" id="pauseExitBtn">✕ Выйти в меню</button>
+    <div class="pause-hint">ESC — быстрая пауза / продолжить</div>
   </div>
 </div>
 

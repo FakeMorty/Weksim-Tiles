@@ -4,12 +4,18 @@ import { KEY_MAP, LANES } from '../config.js';
 import { state } from './state.js';
 import { pressDown, pressUp } from './judge.js';
 import { view, laneMetrics } from '../utils/canvas.js';
-import { endGame } from './loop.js';
+import { pauseGame, resumeGame } from './loop.js';
 
 export function bindInput() {
   window.addEventListener('keydown', e => {
     if (!state.gameRunning) return;
-    if (e.code === 'Escape') { endGame(); return; }
+    if (e.code === 'Escape') {
+      // Toggle pause on ESC
+      if (state.paused) resumeGame(); else pauseGame();
+      e.preventDefault();
+      return;
+    }
+    if (state.paused) return; // ignore lane keys while paused
     const lane = KEY_MAP[e.code];
     if (lane === undefined) return;
     e.preventDefault();
@@ -17,6 +23,7 @@ export function bindInput() {
     pressDown(lane);
   });
   window.addEventListener('keyup', e => {
+    if (state.paused) return;
     const lane = KEY_MAP[e.code];
     if (lane === undefined) return;
     e.preventDefault();
@@ -26,6 +33,7 @@ export function bindInput() {
   const canvas = view.canvas;
   const pointerMap = new Map();
   canvas.addEventListener('pointerdown', e => {
+    if (state.paused) return;
     const lane = getLaneFromX(e.clientX);
     if (lane == null) return;
     canvas.setPointerCapture(e.pointerId);
@@ -34,11 +42,13 @@ export function bindInput() {
     e.preventDefault();
   });
   canvas.addEventListener('pointerup', e => {
+    if (state.paused) return;
     const lane = pointerMap.get(e.pointerId);
     pointerMap.delete(e.pointerId);
     if (lane != null && state.gameRunning) pressUp(lane);
   });
   canvas.addEventListener('pointercancel', e => {
+    if (state.paused) return;
     const lane = pointerMap.get(e.pointerId);
     pointerMap.delete(e.pointerId);
     if (lane != null && state.gameRunning) pressUp(lane);

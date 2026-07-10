@@ -1,12 +1,16 @@
 // Note head + hold cap drawing primitives.
 
 import { LANE_COLORS } from '../config.js';
+import { fxLow } from '../game/settings.js';
 
 export function drawHead(ctx, x, y, size, lane, isHold, holding) {
   ctx.save(); ctx.translate(x, y);
-  // Etap 7: brighter neon glow, slightly stronger when holding
-  ctx.shadowColor = isHold ? '#ff77ff' : (lane % 2 === 0 ? '#00f0ff' : '#b14bff');
-  ctx.shadowBlur = holding ? 34 : 24;
+  // Etap 7: brighter neon glow, slightly stronger when holding. On low FX
+  // we skip shadowBlur entirely — it's the single most expensive Canvas2D op.
+  if (!fxLow()) {
+    ctx.shadowColor = isHold ? '#ff77ff' : (lane % 2 === 0 ? '#00f0ff' : '#b14bff');
+    ctx.shadowBlur = holding ? 34 : 24;
+  }
   const col = isHold
     ? (holding ? '#ffb3ff' : '#d68fff')
     : LANE_COLORS[lane];
@@ -34,8 +38,10 @@ export function drawHead(ctx, x, y, size, lane, isHold, holding) {
 
 export function drawHoldCap(ctx, x, y, lane, isTail, holding) {
   ctx.save(); ctx.translate(x, y);
-  ctx.shadowColor = holding ? '#ff9dff' : '#6efaff';
-  ctx.shadowBlur = 16;
+  if (!fxLow()) {
+    ctx.shadowColor = holding ? '#ff9dff' : '#6efaff';
+    ctx.shadowBlur = 16;
+  }
   ctx.fillStyle = holding ? '#ffc8ff' : '#9efbff';
   ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.fill();
   ctx.shadowBlur = 0;

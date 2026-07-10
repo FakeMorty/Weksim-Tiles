@@ -8,6 +8,7 @@ import { LANES } from '../config.js';
 import { camera, updateCamera, applyCameraTransform } from './camera.js';
 import { getFlashState, updateFlashes } from '../fx/flash.js';
 import { updateAndRenderParticles } from '../fx/particles.js';
+import { fxHigh, fxLow } from '../game/settings.js';
 
 export function render(t, dt) {
   const { ctx, W, H } = view;
@@ -22,10 +23,9 @@ export function render(t, dt) {
   for (let y = 0; y < H; y += 46) { ctx.fillStyle = '#0c1c3a'; ctx.fillRect(0, y, W, 1); }
   ctx.restore();
 
-  // Chromatic aberration: draw the scene 3 times with slight RGB offsets when
-  // aberration > 0. Cheap approximation via globalCompositeOperation.
+  // Chromatic aberration only on 'high' quality — it triples render cost.
   const ab = flash.aberration;
-  if (ab > 0.02) {
+  if (ab > 0.02 && fxHigh()) {
     renderScene(ctx, t, dt, -ab * 4, 0, 'rgba(255,60,120,0.7)');
     renderScene(ctx, t, dt,  ab * 4, 0, 'rgba(60,220,255,0.7)');
     renderScene(ctx, t, dt, 0, 0, null); // main pass on top
@@ -120,10 +120,20 @@ function renderScene(ctx, t, dt, shiftX, shiftY, tint) {
   ctx.fillRect(left, hy - 36, playW, 56);
   ctx.restore();
 
-  // Notes (with hit-scale animation for the note being tapped)
-  const visibleNotes = state.notes.filter(n => !n.judged || n.holding);
-  visibleNotes.sort((a, b) => a.time - b.time);
-  for (const n of visibleNotes) {
+  // Notes: because state.notes is sorted by time (analyzer guarantees), we
+  // scan a narrow window instead of filtering the entire list every frame.
+  // This turns O(N) per frame into O(k) where k = notes on screen (~20).
+  const winStart = t - 0.4;
+  const winEnd   = t + state.fallTime + 0.25;
+  const notes = state.notes;
+  let i0 = state._notesCursor || 0;
+  while (i0 < notes.length && (notes[i0].endTime ?? notes[i0].time) < winStart) i0++;
+  state._notesCursor = i0;
+
+  for (let ni = i0; ni < notes.length; ni++) {
+    const n = notes[ni];
+    if (n.time > winEnd) break;
+    if (n.judged && !n.holding) continue;
     const timeToHead = n.time - t;
     const timeToTail = n.isHold ? (n.endTime - t) : timeToHead;
     if (timeToTail < -0.4 || timeToHead > state.fallTime + 0.25) continue;

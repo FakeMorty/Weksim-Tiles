@@ -8,6 +8,7 @@ export const state = {
   audioCtx: null,
   audioBuffer: null,
   sourceNode: null,
+  gainNode: null,
   fileName: '',
 
   // Analysis result
@@ -28,6 +29,9 @@ export const state = {
 
   // Runtime
   gameRunning: false,
+  paused: false,
+  pauseStart: 0,       // audioCtx.currentTime when paused
+  pauseOffset: 0,      // cumulative pause seconds — subtracted from songTime
   startTime: 0,
   fallTime: 1.45,
   mode: 'drums',
@@ -53,6 +57,7 @@ export function resetPlayState() {
   state.holdsOk = 0;
   state.bullets.length = 0;
   state.particles.length = 0;
+  state._notesCursor = 0;
   for (let i = 0; i < LANES; i++) {
     state.keysDown[i] = false;
     state.activeHold[i] = null;
