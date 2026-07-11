@@ -70,9 +70,12 @@ export function weightedFlux(fluxBands, weights) {
   return out;
 }
 
-// Mode presets. drums = emphasise low bands, vocal = mid/high-mid, classic = balanced.
+// Mode presets. drums = kick+snare focus, hats de-emphasised (they trigger
+// on every 8th/16th note and would flood the map). vocal = mid/high-mid.
+// classic = balanced. Weights tuned in v1.8 after user feedback about
+// "too many notes on drum-heavy tracks".
 export const MODE_WEIGHTS = {
-  drums:   [1.4, 1.8, 1.0, 0.5, 0.4, 0.6],
-  classic: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-  vocal:   [0.3, 0.4, 0.9, 1.6, 1.8, 0.9],
+  drums:   [1.5, 2.0, 1.1, 0.4, 0.3, 0.15],
+  classic: [1.0, 1.1, 1.0, 1.0, 0.9, 0.5],
+  vocal:   [0.2, 0.3, 0.8, 1.6, 1.8, 0.7],
 };

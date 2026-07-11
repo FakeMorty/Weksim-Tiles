@@ -10,11 +10,16 @@ export const state = {
   sourceNode: null,
   gainNode: null,
   fileName: '',
+  fileBytes: null,     // Uint8Array — for cache hashing (Etap 10)
+  fileHash: '',        // SHA-1 hex, cached from fileBytes (Etap 10)
 
   // Analysis result
   notes: [],
   currentBpm: 0,
   currentBpmConf: 0,
+  bpmStable: true,
+  bpmDrift: 0,
+  beatTimes: [],
 
   // Scoring
   score: 0,
@@ -35,6 +40,10 @@ export const state = {
   startTime: 0,
   fallTime: 1.45,
   mode: 'drums',
+  currentDifficulty: 'normal',   // captured at play start (Etap 10)
+  currentSens: 1.25,              // captured for export (Etap 10)
+  lastAnalysis: null,             // full analyzer result — for map export
+  pendingImportedMap: null,       // set by import UI, consumed on next play
 
   // Per-lane transient
   bullets: [],

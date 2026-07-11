@@ -3,6 +3,11 @@
 // the returned onsets into the note layout the game expects (with HOLD detection
 // and lane distribution, ported from v1.1 with minor cleanup).
 
+import { limitDensity, DIFFICULTY_PRESETS } from './density.js';
+import { generateMap } from './mapgen.js';
+import { detectHolds } from './holds.js';
+import { sha1, buildKey, getCached, putCached } from './cache.js';
+
 let worker = null;
 function getWorker() {
   if (worker) return worker;
@@ -32,6 +37,40 @@ function downmix(audioBuffer) {
  */
 export async function analyzeTrack(audioBuffer, modeStr, sens, opts) {
   const sr = audioBuffer.sampleRate;
+  const preset = DIFFICULTY_PRESETS[opts.difficulty] || DIFFICULTY_PRESETS.normal;
+
+  // Etap 10: IndexedDB cache. Hash the raw file bytes if provided, look up
+  // a fully-baked map for this (file × mode × difficulty × sens × ...).
+  // Cache hits complete in ~10 ms instead of 5-8 s.
+  let cacheKey = null;
+  if (opts.fileBytes) {
+    try {
+      const hash = await sha1(opts.fileBytes);
+      cacheKey = buildKey(hash, {
+        mode: modeStr,
+        difficulty: opts.difficulty || 'normal',
+        hpssMode: opts.hpssMode || 'hard',
+        sens,
+        holdMode: opts.holdMode ?? 1,
+        holdEnable: !!opts.holdEnable,
+        dual: !!opts.dual,
+        smartLane: !!opts.smartLane,
+      });
+      const cached = await getCached(cacheKey);
+      if (cached) {
+        opts.onProgress?.(1, 'cache');
+        // Re-hydrate: notes come back as plain objects (structured clone
+        // preserved their shape); TypedArrays inside also survived.
+        return {
+          ...cached,
+          fromCache: true,
+        };
+      }
+    } catch (e) {
+      console.warn('cache lookup failed, proceeding with fresh analysis:', e);
+    }
+  }
+
   const mono = downmix(audioBuffer);
   const w = getWorker();
 
@@ -48,127 +87,130 @@ export async function analyzeTrack(audioBuffer, modeStr, sens, opts) {
     w.addEventListener('message', onMessage);
     // Transfer PCM ownership to worker — zero copy
     w.postMessage(
-      { pcm: mono, sampleRate: sr, mode: modeStr, sens },
+      {
+        pcm: mono,
+        sampleRate: sr,
+        mode: modeStr,
+        sens,
+        // Etap 2: hpssMode = 'off' | 'hard' | 'soft' | 'iterative'
+        hpssMode: opts.hpssMode ?? (opts.hpssLite === false ? 'off' : 'hard'),
+        snapSubdivision: preset.snapSubdivision,
+      },
       [mono.buffer]
     );
   });
 
   // Build note events from onsets + HOLD detection (uses novelty as sustain proxy)
-  const events = buildEvents(result, audioBuffer.duration, modeStr, opts);
+  let events = buildEvents(result, audioBuffer.duration, modeStr, opts);
 
-  // Chord doubling
-  if (opts.dual) {
-    const dualEvents = [];
-    for (let i = 1; i < events.length - 1; i++) {
-      if (!events[i].isHold && Math.random() < 0.11) {
-        dualEvents.push({ ...events[i], chord: true });
-      }
+  // Etap 6 (density cap): trim overly-dense sections down to a playable rate.
+  // Difficulty preset controls the ceiling. HOLD notes are protected.
+  const beforeCount = events.length;
+  events = limitDensity(events, preset.maxNps);
+  const droppedByDensity = beforeCount - events.length;
+
+  // Etap 6: pattern-aware map generation. Uses tracked beats, event
+  // strengths and difficulty preset to produce musically-coherent notes
+  // instead of random-lane assignment.
+  const out = generateMap(
+    events,
+    result.beatTimes || [],
+    result.bpm,
+    {
+      chordProb: opts.dual ? preset.chordProb : 0,
+      smartLane: opts.smartLane,
+      difficulty: opts.difficulty || 'normal',
     }
-    events.push(...dualEvents);
-    events.sort((a, b) => a.time - b.time);
-  }
+  );
 
-  // Lane assignment
-  const out = assignLanes(events, opts.smartLane);
-
-  return {
+  const finalResult = {
     notes: out,
     bpm: result.bpm,
     bpmConfidence: result.bpmConfidence,
     bpmCandidates: result.bpmCandidates,
+    bpmStable: result.bpmStable,
+    bpmDrift: result.bpmDrift,
+    beatTimes: result.beatTimes,
     times: result.onsetTimes,
     analysisMs: result.analysisMs,
+    rawOnsetCount: result.onsetTimes.length,
+    droppedByDensity,
+    difficulty: opts.difficulty || 'normal',
+    fromCache: false,
   };
+
+  // Etap 10: store in IndexedDB for next time. Fire-and-forget — the user
+  // shouldn't wait for the write.
+  if (cacheKey) {
+    putCached(cacheKey, finalResult, {
+      fileName: opts.fileName || '',
+      durationSec: audioBuffer.duration,
+    }).catch(() => { /* already logged */ });
+  }
+
+  return finalResult;
 }
 
 // Build note events (time, endTime, isHold) from the worker output.
 function buildEvents(res, duration, modeStr, opts) {
-  const { onsetTimes, novelty, framesPerSec, bpm } = res;
-  const holdEnable = opts.holdEnable;
-  const holdBias = opts.holdMode; // 0=off, 1=auto, 2=lots
+  const {
+    onsetTimes, onsetStrengths, novelty, framesPerSec, bpm,
+    harmonicEnvelopes, beatTimes,
+  } = res;
 
-  // Estimate frame-level sustained energy for hold detection using a smoothed
-  // novelty envelope. High and stable → sustain (harmonic-like passage).
-  const smoothN = smoothEnvelope(novelty, 5);
-  const nMean = mean(smoothN) || 1e-6;
-
-  const sustainParams = modeStr === 'vocal'
-    ? { thr: nMean * 0.55, minH: 0.36, maxH: 2.10, prob: holdBias === 2 ? 0.70 : holdBias === 1 ? 0.50 : 0 }
-    : modeStr === 'classic'
-      ? { thr: nMean * 0.70, minH: 0.34, maxH: 1.6,  prob: holdBias === 2 ? 0.48 : holdBias === 1 ? 0.32 : 0 }
-      : { thr: nMean * 1.10, minH: 0.28, maxH: 0.90, prob: holdBias === 2 ? 0.28 : holdBias === 1 ? 0.14 : 0 };
-
-  const beatLen = bpm > 40 ? 60 / bpm : 0.5;
-  const events = [];
-
-  for (let idx = 0; idx < onsetTimes.length; idx++) {
-    const t = onsetTimes[idx];
+  // Build onset objects with strength
+  const onsets = [];
+  for (let i = 0; i < onsetTimes.length; i++) {
+    const t = onsetTimes[i];
     if (t < 0.30 || t > duration - 0.30) continue;
-    const nextT = onsetTimes[idx + 1] || duration;
-    let holdDur = 0;
-
-    if (holdEnable && sustainParams.prob > 0 && Math.random() < sustainParams.prob) {
-      const f0 = Math.floor(t * framesPerSec);
-      const maxFrames = Math.floor(sustainParams.maxH * framesPerSec);
-      let sustainFrames = 0;
-      let below = 0;
-      for (let f = f0 + 1; f < smoothN.length && sustainFrames < maxFrames; f++) {
-        if (smoothN[f] > sustainParams.thr) { sustainFrames++; below = 0; }
-        else { below++; if (below > 3) break; sustainFrames++; }
-      }
-      holdDur = sustainFrames / framesPerSec;
-      if (holdDur < sustainParams.minH) holdDur = 0;
-      const gap = nextT - t - 0.16;
-      if (holdDur > gap) holdDur = gap > sustainParams.minH ? gap : 0;
-      if (holdDur > sustainParams.maxH) holdDur = sustainParams.maxH;
-      if (modeStr === 'drums' && holdDur > 0.72) holdDur = 0.45 + Math.random() * 0.27;
-      // Snap to nearest 0.5 beat when we know BPM
-      if (bpm > 50 && holdDur > 0.35) {
-        const beats = Math.round(holdDur / beatLen * 2) / 2;
-        const snapped = Math.max(sustainParams.minH, beats * beatLen);
-        if (snapped <= sustainParams.maxH && snapped < gap) holdDur = snapped;
-      }
-    }
-    events.push({ time: t, endTime: t + holdDur, isHold: holdDur >= 0.34 });
-  }
-  return events;
-}
-
-function assignLanes(events, smartLane) {
-  const laneEnd = [0, 0, 0, 0];
-  const out = [];
-  for (const ev of events) {
-    let candidates = [0, 1, 2, 3].filter(l => laneEnd[l] + 0.06 < ev.time);
-    if (candidates.length === 0) {
-      candidates = [0, 1, 2, 3];
-      candidates.sort((a, b) => laneEnd[a] - laneEnd[b]);
-      candidates = [candidates[0]];
-    }
-    let lane;
-    if (smartLane) {
-      const lastLane = out.length ? out[out.length - 1].lane : -1;
-      const filtered = candidates.filter(c => c !== lastLane);
-      lane = (filtered.length ? filtered : candidates)[Math.floor(Math.random() * (filtered.length || candidates.length))];
-    } else {
-      lane = candidates[Math.floor(Math.random() * candidates.length)];
-    }
-    if (ev.chord) {
-      const twin = out.find(o => Math.abs(o.time - ev.time) < 0.015);
-      if (twin) { lane = ([0, 1, 2, 3].find(c => c !== twin.lane && laneEnd[c] + 0.05 < ev.time)) ?? lane; }
-    }
-    laneEnd[lane] = ev.endTime + 0.035;
-    out.push({
-      time: ev.time,
-      endTime: ev.endTime,
-      isHold: ev.isHold,
-      lane,
-      judged: false,
-      holding: false,
-      holdProgress: 0,
+    onsets.push({
+      time: t,
+      strength: onsetStrengths ? onsetStrengths[i] : 1,
     });
   }
-  out.sort((a, b) => a.time - b.time);
-  return out;
+
+  // Etap 3: hold detection on harmonic energy envelopes (hysteresis, beat-snap,
+  // close-onset merging, vocal-accent flagging).
+  if (harmonicEnvelopes) {
+    return detectHolds(
+      onsets, harmonicEnvelopes, framesPerSec,
+      beatTimes || [], bpm, modeStr,
+      { holdEnable: opts.holdEnable, holdMode: opts.holdMode }
+    );
+  }
+
+  // Fallback: no harmonic mag available (hpssLite disabled) — use novelty
+  // envelope like the v1.x analyzer.
+  const smoothN = smoothEnvelope(novelty, 5);
+  const nMean = mean(smoothN) || 1e-6;
+  const params = modeStr === 'vocal'
+    ? { thr: nMean * 0.55, minH: 0.36, maxH: 2.10, prob: opts.holdMode === 2 ? 0.70 : opts.holdMode === 1 ? 0.50 : 0 }
+    : modeStr === 'classic'
+      ? { thr: nMean * 0.70, minH: 0.34, maxH: 1.60, prob: opts.holdMode === 2 ? 0.48 : opts.holdMode === 1 ? 0.32 : 0 }
+      : { thr: nMean * 1.10, minH: 0.28, maxH: 0.90, prob: opts.holdMode === 2 ? 0.28 : opts.holdMode === 1 ? 0.14 : 0 };
+  const events = [];
+  for (const o of onsets) {
+    let holdDur = 0;
+    if (opts.holdEnable && params.prob > 0 && Math.random() < params.prob) {
+      const f0 = Math.floor(o.time * framesPerSec);
+      const maxF = Math.floor(params.maxH * framesPerSec);
+      let cnt = 0, below = 0;
+      for (let f = f0 + 1; f < smoothN.length && cnt < maxF; f++) {
+        if (smoothN[f] > params.thr) { cnt++; below = 0; }
+        else { below++; if (below > 3) break; cnt++; }
+      }
+      holdDur = cnt / framesPerSec;
+      if (holdDur < params.minH) holdDur = 0;
+      if (holdDur > params.maxH) holdDur = params.maxH;
+    }
+    events.push({
+      time: o.time,
+      endTime: o.time + holdDur,
+      isHold: holdDur >= params.minH,
+      strength: o.strength,
+    });
+  }
+  return events;
 }
 
 function smoothEnvelope(sig, halfWin) {

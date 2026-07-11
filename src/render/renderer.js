@@ -10,6 +10,9 @@ import { getFlashState, updateFlashes } from '../fx/flash.js';
 import { updateAndRenderParticles } from '../fx/particles.js';
 import { fxHigh, fxLow, fxMedium } from '../game/settings.js';
 import { perf, tickPerf } from '../utils/perf.js';
+import { reactive, sampleReactive } from '../fx/musicReactive.js';
+import { settings } from '../game/settings.js';
+import { applyBloom, invalidateBloomBuffer } from './bloom.js';
 
 // Cache expensive per-lane gradients — recomputed only when H changes.
 let laneGradCache = null;
@@ -27,6 +30,8 @@ function getLaneGrad(ctx, x, H) {
 }
 export function invalidateGradCache() {
   laneGradCache = null;
+  vignetteGrad = null;
+  invalidateBloomBuffer();
 }
 
 export function render(t, dt) {
@@ -34,9 +39,38 @@ export function render(t, dt) {
   const flash = getFlashState();
   updateCamera(dt);
   updateFlashes(dt);
-  if (state.gameRunning && !state.paused) tickPerf(dt);
+  if (state.gameRunning && !state.paused) {
+    tickPerf(dt);
+    // Etap 9: sample live spectrum for reactive visuals
+    sampleReactive(dt, t);
+  }
 
-  ctx.clearRect(0, 0, W, H);
+  // Etap 8: motion blur via accumulation. Instead of clearRect we paint a
+  // semi-transparent black rect — old pixels fade out over ~6 frames rather
+  // than vanishing instantly. Gives free trails on all moving elements.
+  // Only on high FX because it costs one full-screen fillRect per frame and
+  // makes the game feel "smearier" (some players dislike this).
+  if (fxHigh() && state.gameRunning && settings.motionBlur) {
+    ctx.fillStyle = 'rgba(5, 6, 13, 0.30)';
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    ctx.clearRect(0, 0, W, H);
+  }
+
+  // Etap 9: bass-driven radial glow behind the play area. Cheap — one
+  // radial-gradient fill per frame. Disabled on low FX to save GPU.
+  if (!fxLow() && settings.bgReactive && state.gameRunning && reactive.bass > 0.05) {
+    const bassLevel = reactive.bass;
+    const beatBoost = reactive.beatFlash * 0.4;
+    const glowRadius = Math.max(W, H) * (0.4 + bassLevel * 0.35);
+    const grad = ctx.createRadialGradient(W / 2, H * 0.55, 0, W / 2, H * 0.55, glowRadius);
+    const alpha = 0.10 + bassLevel * 0.22 + beatBoost;
+    grad.addColorStop(0,   `rgba(80, 60, 200, ${alpha})`);
+    grad.addColorStop(0.5, `rgba(20, 30, 100, ${alpha * 0.4})`);
+    grad.addColorStop(1,   'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  }
 
   // Background grid — cheap, but skipped entirely on low FX to save 40+ fillRects.
   if (!fxLow()) {
@@ -65,8 +99,65 @@ export function render(t, dt) {
     ctx.restore();
   }
 
+  // Etap 8: bloom — additive-blended blurred pass over bright regions.
+  // Runs BEFORE vignette so vignette darkens the bloomed image too.
+  // Only on high FX and if enabled (default off — costs 2-4 ms).
+  if (fxHigh() && settings.bloom) {
+    const intensity = 0.45 + reactive.bass * 0.20; // bass modulates bloom too
+    applyBloom(ctx, W, H, intensity, 6);
+  }
+
+  // Etap 8: vignette — radial darkening at the edges for depth. Very cheap
+  // (one gradient fill), draws AFTER the game scene so it lays on top.
+  if (!fxLow() && settings.vignette) {
+    drawVignette(ctx);
+  }
+
+  // Etap 9: bottom equaliser bars (opt-in via settings.bgSpectrum)
+  if (state.gameRunning && !fxLow() && settings.bgSpectrum && reactive.bars) {
+    drawSpectrumBars(ctx);
+  }
+
   // Version + FPS in corner
   drawOverlayInfo(ctx);
+}
+
+// Cache the vignette gradient across frames — recomputed only when W or H
+// changes (rare, on resize).
+let vignetteGrad = null, vignetteW = 0, vignetteH = 0;
+function drawVignette(ctx) {
+  const { W, H } = view;
+  if (!vignetteGrad || vignetteW !== W || vignetteH !== H) {
+    const cx = W / 2, cy = H / 2;
+    const inner = Math.min(W, H) * 0.35;
+    const outer = Math.max(W, H) * 0.75;
+    const g = ctx.createRadialGradient(cx, cy, inner, cx, cy, outer);
+    g.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    g.addColorStop(1, 'rgba(0, 0, 0, 0.55)');
+    vignetteGrad = g;
+    vignetteW = W; vignetteH = H;
+  }
+  ctx.fillStyle = vignetteGrad;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawSpectrumBars(ctx) {
+  const { W, H } = view;
+  const bars = reactive.bars;
+  const n = bars.length;
+  const barW = W / n;
+  const maxH = H * 0.14;
+  ctx.save();
+  ctx.globalAlpha = 0.28;
+  for (let i = 0; i < n; i++) {
+    const v = bars[i] / 255;
+    const h = v * maxH;
+    // Colour: bass = purple, mid = cyan, high = pink
+    const hue = 200 + i * 4;
+    ctx.fillStyle = `hsl(${hue}, 90%, ${45 + v * 25}%)`;
+    ctx.fillRect(i * barW + 1, H - h, barW - 2, h);
+  }
+  ctx.restore();
 }
 
 function drawOverlayInfo(ctx) {
@@ -151,15 +242,16 @@ function renderScene(ctx, t, dt, shiftX, shiftY, tint) {
 
   ctx.strokeStyle = '#2a5d88'; ctx.lineWidth = 1.4; ctx.strokeRect(left, 0, playW, H);
 
-  // Hit line — glow simplified on low FX
+  // Hit line — glow simplified on low FX + Etap 9 live beat pulse from music
   const hitFlash = flash.hitLine;
+  const beatPulse = reactive.beatFlash * 0.5;
   ctx.save();
   if (!lowFx) {
     ctx.shadowColor = hitFlash > 0.05 ? flash.hitLineColor : '#00f0ff';
-    ctx.shadowBlur = 20 + hitFlash * 40;
+    ctx.shadowBlur = 20 + hitFlash * 40 + beatPulse * 25;
   }
   ctx.strokeStyle = hitFlash > 0.05 ? flash.hitLineColor : '#9ffaff';
-  ctx.lineWidth = 2.6 + hitFlash * 2.5;
+  ctx.lineWidth = 2.6 + hitFlash * 2.5 + beatPulse * 1.5;
   ctx.beginPath(); ctx.moveTo(left, hy); ctx.lineTo(left + playW, hy); ctx.stroke();
   ctx.shadowBlur = 0;
   const bandAlpha = 0.045 + hitFlash * 0.22;
@@ -246,6 +338,21 @@ function renderScene(ctx, t, dt, shiftX, shiftY, tint) {
       ctx.lineWidth = 1.6;
       ctx.beginPath(); ctx.arc(x, yHead, size * 0.95 + (1 - approach) * 20, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
+    }
+    // Etap 8: note trail — 4 ghost copies at previous positions with decaying
+    // alpha. Only on high FX; skipped for HOLD notes (they already have a tail).
+    if (highFx && settings.noteTrails && !n.isHold && timeToHead < state.fallTime * 0.5) {
+      const trailLen = 4;
+      const trailStep = 0.035; // 35ms behind
+      for (let k = 1; k <= trailLen; k++) {
+        const tPast = timeToHead + k * trailStep;
+        if (tPast > state.fallTime) break;
+        const yPast = 44 + (1 - tPast / state.fallTime) * (hy - 74);
+        ctx.save();
+        ctx.globalAlpha = 0.25 * (1 - k / trailLen);
+        drawHead(ctx, x, yPast, size * (1 - k * 0.08), n.lane, false, false);
+        ctx.restore();
+      }
     }
     drawHead(ctx, x, yHead, size, n.lane, n.isHold, n.holding);
   }

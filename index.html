@@ -112,6 +112,23 @@
   .pause-vol input[type=range]{flex:1;accent-color:#00e5ff;}
   .pause-vol .val{font-weight:700;color:#eaffff;font-size:13px;min-width:44px;text-align:right;}
   .pause-hint{color:#5d819d;font-size:11px;margin-top:14px;letter-spacing:.06em;}
+  /* Etap 10: stats + import buttons */
+  #openStatsBtn, #importMapBtn { background:transparent;border:1px solid #2a3c66;color:#7aa9c6;padding:6px 12px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:.08em;text-transform:uppercase;transition:.15s;margin-top:10px;}
+  #openStatsBtn:hover, #importMapBtn:hover { border-color:#51f0ff;color:#dfffff;box-shadow:0 0 12px #00e5ff33;}
+  #statsScreen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(3,5,12,0.94);backdrop-filter:blur(10px);z-index:11;padding:20px;}
+  .stats-panel{width:min(760px,95vw);max-height:90vh;overflow-y:auto;background:linear-gradient(180deg,#0b1124aa,#070a18cc);border:1px solid #1d2a4a;border-radius:18px;padding:26px;}
+  .stats-panel h2{font-family:'Orbitron',sans-serif;color:#7efaff;font-size:22px;margin-bottom:14px;letter-spacing:.06em;}
+  .stats-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
+  .stats-summary .cell{background:#0a1530;border:1px solid #1a2f52;border-radius:12px;padding:12px;text-align:center;}
+  .stats-summary .cell b{display:block;font-family:'Orbitron',sans-serif;font-size:20px;color:#eaffff;margin-top:4px;}
+  .stats-summary .cell span{font-size:11px;color:#6a8fb0;letter-spacing:.08em;text-transform:uppercase;}
+  .stats-list{display:flex;flex-direction:column;gap:6px;}
+  .stats-row{display:grid;grid-template-columns:1.8fr 0.8fr 0.7fr 0.7fr 0.7fr 0.9fr;gap:8px;padding:8px 10px;background:#0a1530;border:1px solid #1a2f52;border-radius:8px;font-size:12px;align-items:center;}
+  .stats-row.header{background:transparent;border:none;color:#6a8fb0;font-size:10px;text-transform:uppercase;letter-spacing:.08em;padding-bottom:2px;}
+  .stats-row .name{color:#cfefff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .stats-row .num{color:#eaffff;font-family:'Orbitron',sans-serif;text-align:right;}
+  .stats-row .diff{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;text-align:center;letter-spacing:.05em;}
+  .stats-empty{text-align:center;color:#5d819d;padding:40px 0;font-size:13px;}
 </style>
 </head>
 <body>
@@ -194,9 +211,24 @@
       <label><input type="checkbox" id="holdEnable" checked> HOLD-ноты</label>
       <label><input type="checkbox" id="dualEnable" checked> Аккорды</label>
       <label><input type="checkbox" id="autoLane" checked> Умная раскладка</label>
+      <label><input type="checkbox" id="bgReactiveCheck" checked> Пульсация фона</label>
+      <label><input type="checkbox" id="bgSpectrumCheck"> Эквалайзер снизу</label>
+      <label><input type="checkbox" id="vignetteCheck" checked> Виньетка</label>
+      <label><input type="checkbox" id="noteTrailsCheck" checked> След за нотами</label>
+      <label><input type="checkbox" id="motionBlurCheck"> Motion blur</label>
+      <label><input type="checkbox" id="bloomCheck"> Bloom (дорого)</label>
     </div>
 
     <div class="sliders" style="margin-top:14px">
+      <div class="slider-box">
+        <label>Сложность <span id="difficultyVal">NORMAL</span></label>
+        <select id="difficultySelect" style="width:100%;margin-top:6px;background:#08132a;color:#bfefff;border:1px solid #1d3358;border-radius:8px;padding:6px;font-family:'JetBrains Mono',monospace;">
+          <option value="easy">EASY — ≤2.5 нот/сек, спокойно</option>
+          <option value="normal" selected>NORMAL — ≤4 нот/сек</option>
+          <option value="hard">HARD — ≤6.5 нот/сек</option>
+          <option value="expert">EXPERT — ≤10 нот/сек, безумие</option>
+        </select>
+      </div>
       <div class="slider-box">
         <label>Громкость <span id="menuVolumeVal">55%</span></label>
         <input type="range" id="menuVolume" min="0" max="100" step="1" value="55">
@@ -209,10 +241,24 @@
           <option value="low">Низкое (для слабых ПК)</option>
         </select>
       </div>
+      <div class="slider-box">
+        <label>HPSS (разделение сигнала)</label>
+        <select id="hpssModeSelect">
+          <option value="off">Выкл (быстро, для чистых треков)</option>
+          <option value="hard" selected>Hard (стандарт, лучше для ударных)</option>
+          <option value="soft">Soft (плавно, лучше для смешанных)</option>
+          <option value="iterative">Iterative (макс качество, ×2 медленнее)</option>
+        </select>
+      </div>
     </div>
 
     <button class="play-btn" id="playBtn" disabled>Сначала загрузи трек</button>
-    <div style="text-align:center"><button id="openCalibrationBtn">⚙ Калибровка задержки</button></div>
+    <div style="text-align:center;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <button id="openCalibrationBtn">⚙ Калибровка задержки</button>
+      <button id="openStatsBtn">📊 Статистика</button>
+      <button id="importMapBtn">📥 Импорт карты</button>
+      <input type="file" id="mapFileInput" accept=".json" style="display:none">
+    </div>
     <div class="hint">
       <b>v1.1 BPM AUTO:</b> теперь игра детектит BPM трека и подстраивает скорость падения.<br>
       Медленный трек 82 BPM → ~1.47s полёт, быстрый 168 BPM → ~0.95s. Можно отключить “Авто BPM” и ставить руками.<br>
@@ -237,12 +283,16 @@
       <div class="result-item">Скорость<b id="finalSpeed">--</b></div>
       <div class="result-item">Score<b id="finalScore2">0</b></div>
       <div class="result-item">FPS avg/1%/min<b id="finalFps">--</b></div>
+      <div class="result-item">Прошлый рекорд<b id="finalBest">—</b></div>
     </div>
     <div style="margin-top:14px">
       <div style="font-size:10px;color:#5a89a6;letter-spacing:.14em;text-transform:uppercase;text-align:center;margin-bottom:6px">Гистограмма попаданий</div>
       <canvas id="hitChart" width="580" height="120" style="width:100%;max-width:580px;height:120px;background:#050b1a;border:1px solid #1a2f52;border-radius:10px;"></canvas>
     </div>
-    <button class="play-btn" id="againBtn" style="margin-top:14px">Сыграть снова</button>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button class="play-btn" id="againBtn" style="flex:2">Сыграть снова</button>
+      <button class="pause-btn" id="exportMapBtn" style="flex:1;margin:0">📤 Экспорт карты</button>
+    </div>
     <div class="ghost" style="margin-top:12px">BPM автосинхронизация включена. Меняй “Подлёт” Slow/Normal/Fast для комфорта.</div>
   </div>
 </div>
@@ -294,6 +344,23 @@
 
     <div class="cal-row" style="margin-top:14px">
       <button class="cal-btn" id="calibrationCloseBtn">← Назад в меню</button>
+    </div>
+  </div>
+</div>
+
+<div id="statsScreen">
+  <div class="stats-panel">
+    <h2>СТАТИСТИКА</h2>
+    <div class="stats-summary">
+      <div class="cell"><span>Игр всего</span><b id="statsTotalPlays">0</b></div>
+      <div class="cell"><span>Нот сыграно</span><b id="statsNotesHit">0</b></div>
+      <div class="cell"><span>Часов музыки</span><b id="statsPlaytime">0</b></div>
+    </div>
+    <div class="stats-list" id="statsList"></div>
+    <div class="cal-row" style="margin-top:16px">
+      <button class="cal-btn" id="statsCloseBtn">← Назад</button>
+      <button class="cal-btn danger" id="statsClearBtn">🗑 Очистить историю</button>
+      <button class="cal-btn danger" id="cacheClearBtn">🗑 Очистить кэш анализа</button>
     </div>
   </div>
 </div>

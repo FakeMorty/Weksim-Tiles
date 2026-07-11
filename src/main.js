@@ -9,6 +9,7 @@ import { loadCalibration } from './game/calibration.js';
 import { loadSettings } from './game/settings.js';
 import { bindCalibration } from './ui/calibration.js';
 import { bindPause } from './ui/pause.js';
+import { bindStats } from './ui/stats.js';
 import { APP_VERSION } from './config.js';
 
 loadCalibration();
@@ -20,5 +21,6 @@ bindMenu();
 bindInput();
 bindCalibration();
 bindPause();
+bindStats();
 idleRender();
 console.log('%cWeksim-Tiles v' + APP_VERSION, 'color:#7efaff;font-weight:bold');

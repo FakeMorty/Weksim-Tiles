@@ -28,6 +28,36 @@ export function bindPause() {
     });
   }
 
+  // Etap 2: HPSS mode selector (in menu)
+  const hpssSel = document.getElementById('hpssModeSelect');
+  if (hpssSel) {
+    hpssSel.value = settings.hpssMode;
+    hpssSel.addEventListener('change', () => {
+      settings.hpssMode = hpssSel.value;
+      saveSettings();
+    });
+  }
+
+  // Etap 9: reactive background + spectrum toggles
+  bindCheckbox('bgReactiveCheck', 'bgReactive');
+  bindCheckbox('bgSpectrumCheck', 'bgSpectrum');
+
+  // Etap 8: postprocess effect toggles
+  bindCheckbox('vignetteCheck',   'vignette');
+  bindCheckbox('noteTrailsCheck', 'noteTrails');
+  bindCheckbox('motionBlurCheck', 'motionBlur');
+  bindCheckbox('bloomCheck',      'bloom');
+}
+
+function bindCheckbox(elId, settingKey) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.checked = settings[settingKey];
+  el.addEventListener('change', () => {
+    settings[settingKey] = el.checked;
+    saveSettings();
+  });
+
   refreshVolumeUI();
 }
 
