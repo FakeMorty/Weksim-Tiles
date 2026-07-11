@@ -94,6 +94,9 @@ export const fr = {
     videoExportingPct: 'Enregistrement… {pct}%',
     videoExported: 'Vidéo sauvegardée',
     videoNoAudio: 'Audio du morceau non chargé',
+    analysisTitle: 'Analyse du morceau',
+    analysisHint: 'La 1re analyse prend 4–8 s · puis en cache',
+    analysisReady: 'Prêt · démarrage…',
   },
   hud: {
     score: 'SCORE', accuracy: 'PRÉC', combo: 'COMBO',

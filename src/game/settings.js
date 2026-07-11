@@ -2,6 +2,7 @@
 // so that things which change per-play don't touch calibration data.
 
 const LS_KEY = 'wt.settings.v1';
+const MIGRATION_FLAG = 'wt.settings.migrated.v124'; // one-shot Etap E migration
 
 const DEFAULTS = {
   volume: 0.55,          // 0..1, master output volume
@@ -17,7 +18,7 @@ const DEFAULTS = {
   // Etap E (v1.24)
   warmup: true,          // 4-beat count-in metronome before track starts
   warmupBeats: 4,        // number of count-in beats (2..8)
-  hitSound: 'off',       // 'off' | 'click' | 'kick' | 'snare' | 'custom'
+  hitSound: 'click',     // 'off' | 'click' | 'kick' | 'snare' | 'custom' — on by default (Etap E v1.24.1)
   hitSoundVolume: 0.5,   // 0..1
   hitSoundCustomB64: '', // base64-encoded custom sample (data-URL body)
   botHitSound: 'click',  // separate hit sound for bot playback ('off' | 'click' | 'kick' | 'snare' | 'custom')
@@ -46,6 +47,18 @@ export function loadSettings() {
     if (typeof obj.hitSoundVolume === 'number') settings.hitSoundVolume = Math.max(0, Math.min(1, obj.hitSoundVolume));
     if (typeof obj.hitSoundCustomB64 === 'string') settings.hitSoundCustomB64 = obj.hitSoundCustomB64;
     if (typeof obj.botHitSound === 'string') settings.botHitSound = obj.botHitSound;
+
+    // v1.24.1: one-shot migration — users of v1.24.0 got hitSound='off' by
+    // default; nobody would think to turn it on. Force it back to 'click'
+    // ONCE, then set a flag so we never override the user's choice again.
+    try {
+      if (!localStorage.getItem(MIGRATION_FLAG)) {
+        if (settings.hitSound === 'off') settings.hitSound = 'click';
+        if (!settings.botHitSound || settings.botHitSound === 'off') settings.botHitSound = 'click';
+        localStorage.setItem(MIGRATION_FLAG, '1');
+        saveSettings();
+      }
+    } catch { /* ignore */ }
   } catch { /* ignore */ }
 }
 

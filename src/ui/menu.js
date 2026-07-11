@@ -189,6 +189,19 @@ async function startGameSequence() {
   const btn = document.getElementById('playBtn');
   btn.disabled = true;
   btn.textContent = t('menu.playButtonBusy');
+  // v1.24.1: use the big analysis overlay so users can actually see progress
+  const overlay = document.getElementById('analysisOverlay');
+  const overlayName = document.getElementById('analysisTrackName');
+  const overlayBar = document.getElementById('analysisBar');
+  const overlayPct = document.getElementById('analysisPct');
+  const overlayStage = document.getElementById('analysisStage');
+  if (overlay) {
+    overlay.classList.add('active');
+    if (overlayName) overlayName.textContent = state.fileName || '—';
+    if (overlayBar) overlayBar.style.width = '0%';
+    if (overlayPct) overlayPct.textContent = '0%';
+    if (overlayStage) overlayStage.textContent = t('menu.analyzingHeader', { mode: state.mode.toUpperCase() });
+  }
   const topNote = document.getElementById('topNote');
   topNote.style.display = 'block';
   topNote.textContent = t('menu.analyzingHeader', { mode: state.mode.toUpperCase() });
@@ -233,6 +246,9 @@ async function startGameSequence() {
         onProgress: (p, stage) => {
           const pct = Math.round(p * 100);
           topNote.innerHTML = t('menu.analyzing', { pct, stage: stageNames[stage] || stage });
+          if (overlayBar) overlayBar.style.width = pct + '%';
+          if (overlayPct) overlayPct.textContent = pct + '%';
+          if (overlayStage) overlayStage.textContent = stageNames[stage] || stage;
         },
       });
     }
@@ -305,8 +321,13 @@ async function startGameSequence() {
     });
     document.getElementById('holdCountEl').textContent = t('hud.hold', { n: state.holdsTotal });
     document.getElementById('bpmEl').textContent = t('hud.bpmValue', { bpm: Math.round(state.currentBpm) });
+    // Show 100% briefly, then hide overlay + start game
+    if (overlayBar) overlayBar.style.width = '100%';
+    if (overlayPct) overlayPct.textContent = '100%';
+    if (overlayStage) overlayStage.textContent = t('menu.analysisReady');
     setTimeout(() => {
       topNote.style.display = 'none';
+      if (overlay) overlay.classList.remove('active');
       startPlay();
       analyzing = false;
     }, 620);
@@ -316,6 +337,7 @@ async function startGameSequence() {
     btn.disabled = false;
     updatePlayButton();
     document.getElementById('topNote').style.display = 'none';
+    if (overlay) overlay.classList.remove('active');
     analyzing = false;
   }
 }

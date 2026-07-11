@@ -95,6 +95,9 @@ export const te = {
     videoExportingPct: 'Recording video… {pct}%',
     videoExported: 'Video saved',
     videoNoAudio: 'Track audio not loaded',
+    analysisTitle: 'Analysing track',
+    analysisHint: 'First run of a track takes 4–8 s · cached afterwards',
+    analysisReady: 'Ready · starting…',
   },
   hud: {
     score: 'స్కోరు', accuracy: 'ఖచ్చితత్వం', combo: 'కాంబో',

@@ -96,6 +96,9 @@ export const de = {
     videoExportingPct: 'Video wird aufgezeichnet… {pct}%',
     videoExported: 'Video gespeichert',
     videoNoAudio: 'Titel-Audio nicht geladen',
+    analysisTitle: 'Titel wird analysiert',
+    analysisHint: 'Erste Analyse dauert 4–8 s · dann im Cache',
+    analysisReady: 'Bereit · Start…',
   },
   hud: {
     score: 'PUNKTE', accuracy: 'GEN', combo: 'COMBO',

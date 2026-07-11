@@ -67,6 +67,16 @@
   #comboText{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-family:'Orbitron',sans-serif;font-size: clamp(26px,5vw,44px);color:#fff; text-shadow:0 0 18px #ff39e8, 0 0 40px #00f0ff66; opacity:0; transition:opacity .12s; pointer-events:none; z-index:4}
   #judgeText{position:absolute;left:50%;top:47%;transform:translate(-50%,-50%);font-weight:700;font-size:18px;letter-spacing:.16em;text-transform:uppercase;opacity:0;transition:.12s;pointer-events:none;z-index:4;text-shadow:0 0 12px currentColor}
   #topNote{position:absolute;top:14px;left:50%;transform:translateX(-50%);font-size:11px;letter-spacing:.14em;color:#5f8aa8;z-index:6;display:none;text-transform:uppercase; text-align:center; max-width:90vw}
+  /* Analysis overlay (Etap E v1.24.1) — large, unmissable */
+  #analysisOverlay{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(3,5,12,0.88);backdrop-filter:blur(10px);z-index:20;}
+  #analysisOverlay.active{display:flex;}
+  .anl-title{font-family:'Orbitron',sans-serif;font-weight:800;letter-spacing:.14em;font-size:22px;color:#7efaff;text-shadow:0 0 20px #00e5ff88;margin-bottom:6px;text-transform:uppercase;}
+  .anl-track{color:#9ecae8;font-size:13px;margin-bottom:24px;max-width:80vw;text-align:center;word-break:break-all;}
+  .anl-progress{width:min(520px,80vw);height:14px;background:#0a1230;border:1px solid #1e355a;border-radius:8px;overflow:hidden;box-shadow:0 0 22px #00e5ff22 inset;}
+  .anl-progress i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#00f0ff,#7b61ff);box-shadow:0 0 12px #6ef;transition:width .12s;}
+  .anl-pct{margin-top:12px;font-family:'Orbitron',sans-serif;color:#eaffff;font-size:32px;letter-spacing:.06em;text-shadow:0 0 14px #00eaffaa;}
+  .anl-stage{color:#5da6c8;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-top:6px;min-height:14px;}
+  .anl-hint{color:#4a6d88;font-size:10px;letter-spacing:.1em;margin-top:22px;text-transform:uppercase;}
   #holdToast{position:absolute;left:50%;top:57%;transform:translateX(-50%);font-size:12px;letter-spacing:.14em;color:#ffc8ff;text-shadow:0 0 10px #ff66ff99;opacity:0;transition:.15s;pointer-events:none;z-index:4}
   #bpmBadge{position:absolute;top:14px;right:18px; font-size:11px; color:#6bcfe8; letter-spacing:.1em; z-index:6; display:none; background:#06172ecc; padding:6px 10px; border-radius:9px; border:1px solid #1d3a5a}
   /* bottom */
@@ -156,6 +166,15 @@
 <div id="judgeText"></div>
 <div id="holdToast">HOLD!</div>
 <div id="topNote"></div>
+
+<div id="analysisOverlay">
+  <div class="anl-title" data-i18n="menu.analysisTitle">Analysing track</div>
+  <div class="anl-track" id="analysisTrackName">—</div>
+  <div class="anl-progress"><i id="analysisBar"></i></div>
+  <div class="anl-pct" id="analysisPct">0%</div>
+  <div class="anl-stage" id="analysisStage">—</div>
+  <div class="anl-hint" data-i18n="menu.analysisHint">First run of a track takes 4–8 s · cached afterwards</div>
+</div>
 <div id="bpmBadge"></div>
 
 <div id="hud">
@@ -191,14 +210,6 @@
         <div class="tag" data-i18n="menu.tagTapHold">D F J K / tap & hold</div>
         <div class="tag" data-i18n="menu.tagOfflineAnalysis">offline analysis</div>
       </div>
-    </div>
-
-    <div id="libraryPanel" style="display:none; margin-top:14px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-        <div style="font-size:11px; color:#6a8fb0; text-transform:uppercase; letter-spacing:.08em;" data-i18n="menu.libraryHeader">Track library (this session)</div>
-        <button id="libClearBtn" style="background:#161a34; color:#8899c0; border:1px solid #2a3c66; border-radius:8px; padding:4px 10px; font-size:11px; cursor:pointer; font-family:'JetBrains Mono',monospace;" data-i18n="menu.libraryClear">Clear all</button>
-      </div>
-      <div id="libraryList" style="display:flex; flex-direction:column; gap:8px; max-height:280px; overflow-y:auto; padding-right:4px;"></div>
     </div>
 
     <div class="row">
@@ -306,6 +317,18 @@
         <label data-i18n="meta.langLabel">Language</label>
         <select id="languageSelect"></select>
       </div>
+    </div>
+
+    <div id="libraryPanel" style="display:none; margin-top:16px;">
+      <div id="libraryHeader" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; cursor:pointer; user-select:none;">
+        <div style="font-size:11px; color:#7aa9c6; text-transform:uppercase; letter-spacing:.08em; display:flex; align-items:center; gap:8px;">
+          <span id="libraryChevron" style="display:inline-block; transition:transform .15s; color:#00d0ff;">▼</span>
+          <span data-i18n="menu.libraryHeader">Track library (this session)</span>
+          <span id="libraryCount" style="color:#5a89a6; font-size:10px;"></span>
+        </div>
+        <button id="libClearBtn" style="background:#161a34; color:#8899c0; border:1px solid #2a3c66; border-radius:8px; padding:4px 10px; font-size:11px; cursor:pointer; font-family:'JetBrains Mono',monospace;" data-i18n="menu.libraryClear">Clear all</button>
+      </div>
+      <div id="libraryList" style="display:flex; flex-direction:column; gap:8px; max-height:320px; overflow-y:auto; padding-right:4px;"></div>
     </div>
 
     <button class="play-btn" id="playBtn" disabled data-i18n="menu.playButtonPickTrack">Load a track first</button>

@@ -94,6 +94,9 @@ export const es = {
     videoExportingPct: 'Grabando vídeo… {pct}%',
     videoExported: 'Vídeo guardado',
     videoNoAudio: 'Audio de la pista no cargado',
+    analysisTitle: 'Analizando pista',
+    analysisHint: '1er análisis 4–8 s · después en caché',
+    analysisReady: 'Listo · empezando…',
   },
   hud: {
     score: 'PUNTOS', accuracy: 'PREC', combo: 'COMBO',

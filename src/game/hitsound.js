@@ -21,6 +21,19 @@ export function bindHitSoundOutput(ctx, dest) {
   if (settings.hitSoundCustomB64 && !customBuffer) {
     decodeCustomFromB64(settings.hitSoundCustomB64).catch(() => {});
   }
+  // v1.24.1: warm up the audio graph — play a silent click so the browser
+  // pre-compiles the oscillator/gain pathway. Otherwise the first real hit
+  // has a noticeable delay on some setups.
+  if (audioCtx && destination) {
+    try {
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      g.gain.value = 0.0001;
+      osc.connect(g); g.connect(destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.01);
+    } catch { /* ignore */ }
+  }
 }
 
 /**

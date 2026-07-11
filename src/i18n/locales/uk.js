@@ -95,6 +95,9 @@ export const uk = {
     videoExportingPct: 'Запис відео… {pct}%',
     videoExported: 'Відео збережено',
     videoNoAudio: 'Аудіо треку не завантажено',
+    analysisTitle: 'Аналіз треку',
+    analysisHint: 'Перший запуск 4–8 с · далі з кешу',
+    analysisReady: 'Готово · запуск…',
   },
   hud: {
     score: 'ОЧКИ', accuracy: 'ТОЧН', combo: 'КОМБО',

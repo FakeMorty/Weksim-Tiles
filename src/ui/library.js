@@ -12,15 +12,27 @@ import { t } from '../i18n/i18n.js';
 
 let onPlayCb = null;
 let onBotCb = null;
+let collapsed = false;
 
 export function bindLibrary(handlers) {
   onPlayCb = handlers.onPlay;
   onBotCb = handlers.onBot;
   const clearBtn = document.getElementById('libClearBtn');
   if (clearBtn) {
-    clearBtn.addEventListener('click', () => {
+    clearBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
       const tracks = listTracks();
-      for (const t of tracks) removeTrack(t.id);
+      for (const tr of tracks) removeTrack(tr.id);
+    });
+  }
+  // Header toggles collapse
+  const header = document.getElementById('libraryHeader');
+  if (header) {
+    header.addEventListener('click', (e) => {
+      // Don't toggle if user clicked the Clear button
+      if (e.target.closest('#libClearBtn')) return;
+      collapsed = !collapsed;
+      render();
     });
   }
   onLibraryChange(render);
@@ -30,6 +42,8 @@ export function bindLibrary(handlers) {
 export function render() {
   const panel = document.getElementById('libraryPanel');
   const list = document.getElementById('libraryList');
+  const chevron = document.getElementById('libraryChevron');
+  const count = document.getElementById('libraryCount');
   if (!panel || !list) return;
   const tracks = listTracks();
   if (tracks.length === 0) {
@@ -37,6 +51,10 @@ export function render() {
     return;
   }
   panel.style.display = 'block';
+  if (count) count.textContent = '(' + tracks.length + ')';
+  if (chevron) chevron.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+  list.style.display = collapsed ? 'none' : 'flex';
+  if (collapsed) return;
   list.innerHTML = '';
   tracks.forEach((track, idx) => {
     list.appendChild(makeCard(track, idx + 1));

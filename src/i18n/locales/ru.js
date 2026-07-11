@@ -108,6 +108,9 @@ export const ru = {
     videoExportingPct: 'Запись видео… {pct}%',
     videoExported: 'Видео сохранено',
     videoNoAudio: 'Аудио трека не загружено',
+    analysisTitle: 'Анализ трека',
+    analysisHint: 'Первый запуск трека 4–8 с · далее из кэша',
+    analysisReady: 'Готово · запуск…',
   },
   hud: {
     score: 'ОЧКИ',

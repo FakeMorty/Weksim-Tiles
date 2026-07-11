@@ -96,14 +96,18 @@ export function pressDown(lane) {
   state.lastShotTime[lane] = songTime();
   state.flashes[lane] = 1;
 
-  const t = judgeTime();
+  // v1.24.2: renamed local `t` → `tNow` to stop shadowing the imported
+  // i18n `t()` function. The shadow silently broke tap-hit judgements
+  // (crash at `tierLabel = t(TIER_KEY[...])`), so combo text, judge popups
+  // AND hit sounds all failed to fire on tap notes — only HOLDs worked.
+  const tNow = judgeTime();
   const mult = judgeMultiplier();
 
   // hold start match
   let best = null, bestDiff = 999, bestSigned = 0;
   state.notes.forEach(n => {
     if (n.judged || n.lane !== lane || !n.isHold || n.holding) return;
-    const signed = t - n.time;
+    const signed = tNow - n.time;
     const diff = Math.abs(signed);
     if (diff < bestDiff) { bestDiff = diff; best = n; bestSigned = signed; }
   });
@@ -136,7 +140,7 @@ export function pressDown(lane) {
   let tapBest = null, tapDiff = 999, tapSigned = 0;
   state.notes.forEach(n => {
     if (n.judged || n.lane !== lane || n.isHold) return;
-    const signed = t - n.time;
+    const signed = tNow - n.time;
     const diff = Math.abs(signed);
     if (diff < tapDiff) { tapDiff = diff; tapBest = n; tapSigned = signed; }
   });
@@ -191,8 +195,8 @@ export function pressUp(lane) {
   laneKeysEls[lane].classList.remove('holding');
   const hn = state.activeHold[lane];
   if (hn) {
-    const t = judgeTime();
-    const remain = hn.endTime - t;
+    const tNow = judgeTime();
+    const remain = hn.endTime - tNow;
     finishHold(lane, remain <= JUDGE.HOLD_END_TOL * judgeMultiplier());
   }
 }

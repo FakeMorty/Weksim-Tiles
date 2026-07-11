@@ -95,6 +95,9 @@ export const el = {
     videoExportingPct: 'Recording video… {pct}%',
     videoExported: 'Video saved',
     videoNoAudio: 'Track audio not loaded',
+    analysisTitle: 'Analysing track',
+    analysisHint: 'First run of a track takes 4–8 s · cached afterwards',
+    analysisReady: 'Ready · starting…',
   },
   hud: {
     score: 'ΣΚΟΡ', accuracy: 'ΑΚΡ', combo: 'ΚΟΜΠΟ',
