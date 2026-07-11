@@ -2,14 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#05060d">
-<link rel="manifest" href="./manifest.json">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self' data: blob:;">
-<title>Rhythm Shooter Mobile</title>
+<title>RHYTHM SHOOTER // neon tiles v1.5 STFT</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Orbitron:wght@600;800&display=swap');
   *{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-user-select:none;}
@@ -72,7 +67,7 @@
   #comboText{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-family:'Orbitron',sans-serif;font-size: clamp(26px,5vw,44px);color:#fff; text-shadow:0 0 18px #ff39e8, 0 0 40px #00f0ff66; opacity:0; transition:opacity .12s; pointer-events:none; z-index:4}
   #judgeText{position:absolute;left:50%;top:47%;transform:translate(-50%,-50%);font-weight:700;font-size:18px;letter-spacing:.16em;text-transform:uppercase;opacity:0;transition:.12s;pointer-events:none;z-index:4;text-shadow:0 0 12px currentColor}
   #topNote{position:absolute;top:14px;left:50%;transform:translateX(-50%);font-size:11px;letter-spacing:.14em;color:#5f8aa8;z-index:6;display:none;text-transform:uppercase; text-align:center; max-width:90vw}
-  /* Analysis overlay (Etap E v1.24.1) */
+  /* Analysis overlay (Etap E v1.24.1) — large, unmissable */
   #analysisOverlay{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(3,5,12,0.88);backdrop-filter:blur(10px);z-index:20;}
   #analysisOverlay.active{display:flex;}
   .anl-title{font-family:'Orbitron',sans-serif;font-weight:800;letter-spacing:.14em;font-size:22px;color:#7efaff;text-shadow:0 0 20px #00e5ff88;margin-bottom:6px;text-transform:uppercase;}
@@ -162,69 +157,9 @@
   .stats-row .num{color:#eaffff;font-family:'Orbitron',sans-serif;text-align:right;}
   .stats-row .diff{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;text-align:center;letter-spacing:.05em;}
   .stats-empty{text-align:center;color:#5d819d;padding:40px 0;font-size:13px;}
-  /* ==== MOBILE ADAPTATIONS ==== */
-  @media (hover: none) {
-    button:hover, .mode-btn:hover, .cal-btn:hover, .pause-btn:hover { transform: none !important; filter: none !important; box-shadow: inherit !important; }
-    .dropzone:hover { border-color: #2a4a7a; background: #0a1230aa; color: #88b8d8; box-shadow: none; }
-  }
-  @media (pointer: coarse) {
-    button, .mode-btn, .cal-btn, .pause-btn { min-height: 48px; font-size: 14px; }
-    input[type=range] { height: 34px; }
-    input[type=checkbox] { transform: scale(1.4); margin-right: 8px; }
-    select { min-height: 44px; font-size: 14px; }
-    .toggle-row label { min-height: 40px; padding: 4px 0; }
-    .dropzone { padding: 34px 16px; font-size: 15px; }
-  }
-  @media (max-width: 600px) {
-    body { font-size: 14px; }
-    .panel { padding: 16px 14px; border-radius: 14px; }
-    h1 { font-size: 32px; margin-bottom: 6px; }
-    .subtitle { font-size: 11px; margin-bottom: 16px; }
-    .sliders { grid-template-columns: 1fr !important; gap: 8px; }
-    .modes { flex-direction: column; }
-    .mode-btn { min-width: 0; padding: 14px; font-size: 14px; }
-    .row { flex-direction: column; }
-    .toggle-row { flex-direction: column; align-items: flex-start; gap: 6px; }
-    .result-grid { grid-template-columns: 1fr 1fr !important; }
-    .stats-summary { grid-template-columns: 1fr 1fr 1fr; }
-    .stats-row { font-size: 11px; grid-template-columns: 1.4fr 0.7fr 0.9fr 0.6fr 0.6fr; }
-    .stats-row .num.combo-col { display: none; }
-    .cal-row { flex-direction: column; }
-    .hud-pill { font-size: 11px; padding: 5px 9px; }
-    .hud-big { font-size: 17px; }
-    #hud { padding: 8px 10px; }
-    .lane-key { font-size: 15px; padding: 8px 0 12px; }
-    #topNote { font-size: 10px; }
-  }
-  #rotateHint {
-    display: none;
-    position: fixed; inset: 0;
-    background: #05060d;
-    z-index: 100;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: #7efaff;
-    text-align: center;
-    padding: 20px;
-    font-family: 'Orbitron', sans-serif;
-  }
-  #rotateHint .icon { font-size: 84px; margin-bottom: 20px; animation: rotateNudge 2.4s ease-in-out infinite; }
-  #rotateHint .title { font-size: 20px; letter-spacing: 0.1em; margin-bottom: 10px; }
-  #rotateHint .desc { font-size: 13px; color: #8ecae0; font-family: 'JetBrains Mono', monospace; max-width: 300px; line-height: 1.5; }
-  @keyframes rotateNudge {
-    0%, 40%, 100% { transform: rotate(0deg); }
-    60%, 90% { transform: rotate(-90deg); }
-  }
-  html, body { touch-action: none; overscroll-behavior: none; }
 </style>
 </head>
 <body>
-<div id="rotateHint">
-  <div class="icon">📱</div>
-  <div class="title" data-i18n="mobile.rotateTitle">ROTATE YOUR SCREEN</div>
-  <div class="desc" data-i18n="mobile.rotateDesc">The game is designed for landscape orientation</div>
-</div>
 <canvas id="game"></canvas>
 
 <div id="comboText"></div>
@@ -319,8 +254,6 @@
       <label><input type="checkbox" id="noteTrailsCheck" checked> <span data-i18n="menu.noteTrails">Note trails</span></label>
       <label><input type="checkbox" id="motionBlurCheck"> <span data-i18n="menu.motionBlur">Motion blur</span></label>
       <label><input type="checkbox" id="bloomCheck"> <span data-i18n="menu.bloom">Bloom (expensive)</span></label>
-      <label><input type="checkbox" id="hapticCheck" checked> <span data-i18n="mobile.hapticToggle">📳 Vibration</span></label>
-      <label><input type="checkbox" id="wakeLockCheck" checked> <span data-i18n="mobile.wakeLockToggle">🔆 Keep screen on</span></label>
     </div>
 
     <div class="sliders" style="margin-top:14px">
@@ -358,8 +291,8 @@
         <label data-i18n="menu.nmf">NMF instrument refinement</label>
         <select id="nmfModeSelect">
           <option value="off" data-i18n="menu.nmfOff">Off (fastest)</option>
-          <option value="fast" selected data-i18n="menu.nmfFast">Fast (+2s, weak PCs)</option>
-          <option value="auto" data-i18n="menu.nmfAuto">Auto (+4s, recommended)</option>
+          <option value="fast" data-i18n="menu.nmfFast">Fast (+2s, weak PCs)</option>
+          <option value="auto" selected data-i18n="menu.nmfAuto">Auto (+4s, recommended)</option>
           <option value="quality" data-i18n="menu.nmfQuality">Quality (+6s, best)</option>
         </select>
       </div>

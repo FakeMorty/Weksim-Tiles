@@ -64,18 +64,7 @@ globalThis.localStorage = {
   setItem(k, v) { this._s[k] = String(v); },
   removeItem(k) { delete this._s[k]; },
 };
-globalThis.navigator = {
-  userAgent: 'Node',
-  language: 'en',
-  languages: ['en'],
-  maxTouchPoints: 0,
-  vibrate: () => true,
-  wakeLock: { request: () => Promise.resolve({ release() {} }) },
-};
-globalThis.screen = {
-  width: 1280, height: 800,
-  orientation: { type: 'landscape-primary', addEventListener() {}, lock: () => Promise.resolve() },
-};
+globalThis.navigator = globalThis.navigator || { userAgent: 'Node', language: 'en', languages: ['en'] };
 if (!globalThis.crypto || !globalThis.crypto.subtle) {
   try { Object.defineProperty(globalThis, 'crypto', { value: { subtle: { digest: () => Promise.resolve(new ArrayBuffer(20)) } }, configurable: true }); }
   catch { /* modern node already has one */ }
@@ -159,7 +148,6 @@ const modules = [
   'src/ui/library.js',
   'src/ui/videoExport.js',
   'src/ui/menu.js',
-  'src/mobile/mobileFeatures.js',
   'src/main.js',
 ];
 

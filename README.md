@@ -1,41 +1,79 @@
-# Rhythm Shooter Mobile
+# Rhythm Shooter // neon tiles
 
-Touch-first версия ритм-игры [Weksim-Tiles](https://github.com/FakeMorty/Weksim-Tiles), адаптированная под смартфоны и планшеты.
+Ритм-игра в стиле Piano Tiles + shooter. Неон-минимализм, Canvas2D, автогенерация карт из твоей музыки.
 
-**Играть:** https://fakemorty.github.io/Weksim-Tiles-Mobile/
+**Играть в браузере:** https://fakemorty.github.io/Weksim-Tiles/
 
-## Отличия от десктоп-версии
+## Возможности
 
-- Оптимизировано под touch: большие тап-зоны, отключён hover, viewport под iOS/Android
-- По умолчанию Low FX + HPSS off — быстрее на слабых мобильных GPU
-- Vibration API — тактильная отдача на попаданиях, разные паттерны по тирам
-- Screen Wake Lock — экран не гаснет во время игры
-- PWA manifest — можно добавить на главный экран как приложение
-- Rotate hint — подсказка повернуть в ландшафт
-- Адаптивный CSS: колонки перестраиваются на портрете, HUD ужимается
+- 4 дорожки, стреляешь по летящим нотам
+- Загрузка своей музыки: MP3 / WAV / OGG / FLAC
+- Автоматический анализ трека в браузере, ничего никуда не отправляется
+- 3 режима: **DRUMS** / **CLASSIC** / **VOCAL** (разные веса частотных полос)
+- Автоматическая синхронизация скорости под BPM
+- Калибровка задержки (для Bluetooth-наушников, беспроводных мониторов)
+- HOLD-ноты, аккорды, умная раскладка
 
 ## Управление
 
-- Тап по нижней части дорожки — попадание
-- Удержание — HOLD-нота
-- Кнопка меню в углу — пауза
+- `D F J K` — огонь по 4 линиям
+- Также: `A S L ;` / `1 2 3 4` / тап на экран
+- `ESC` — выход в меню
+
+## Тайминги (по умолчанию, режим Normal)
+
+- MARVELOUS ±25 ms · 350 pts
+- PERFECT ±48 ms · 300 pts
+- GREAT ±85 ms · 220 pts
+- GOOD ±135 ms · 140 pts
+- OK ±190 ms · 70 pts
+- MISS — комбо ломается
+
+Строгость окон настраивается в разделе «Калибровка задержки».
 
 ## Технологии
 
-Ядро аналайзера то же, что в десктоп-версии: STFT + HPSS + multiband spectral flux + Ellis DP beat tracking. Всё в Web Worker.
+- Vanilla JS, ES-модули, Canvas2D, Web Audio API
+- Анализ в Web Worker: STFT (2048/512) + 6-полосный spectral flux + autocorrelation BPM
+- Адаптивные пороги + peak-picking
+- Ноль зависимостей на клиенте, деплой статикой
 
-## Ограничения
+## Запуск локально (для разработки)
 
-- Web Worker с ES-модулями — iOS Safari 16.4+ / Chrome 80+
-- Wake Lock API — Chrome/Edge на Android, iOS 16.4+
-- Vibration API — Android (в iOS не работает)
-- Screen Orientation API — не работает без fullscreen
+Игра — чистая статика, но использует ES-модули и Web Worker, поэтому нужен HTTP-сервер (открытие как `file://` не сработает из-за CORS для module workers).
+
+```bash
+# Вариант 1 — Python (обычно уже стоит)
+python -m http.server 8000
+# открыть http://localhost:8000
+
+# Вариант 2 — Node
+npx serve .
+
+# Вариант 3 — VS Code Live Server extension
+```
+
+## Как это опубликовано
+
+Автоматический деплой через GitHub Actions на GitHub Pages. Любой push в `main` → через ~40 секунд обновление на сайте. Смотри `.github/workflows/pages.yml`.
+
+## Обновление игры
+
+После получения нового патча/архива:
+
+```bash
+git add .
+git commit -m "update"
+git push
+```
+
+Через ~40 сек новая версия на https://fakemorty.github.io/Weksim-Tiles/
 
 ## Разработка
 
-```bash
-python -m http.server 8000
-# открыть http://localhost:8000 с DevTools в mobile emulation
-```
+- `ROADMAP.md` — план развития
+- `src/` — исходники, разбиты по подсистемам (audio/game/render/fx/ui)
+- `scripts/smoketest.mjs` — прогон всех модулей через Node с моками браузера
+- `scripts/analyzer-test.mjs` — функциональный тест анализатора на синтетическом PCM
 
-Или запуск как обычной веб-страницы через любой HTTP-сервер.
+Версия: **1.5.0**

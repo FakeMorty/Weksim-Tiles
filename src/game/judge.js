@@ -6,7 +6,7 @@ import { JUDGE, SCORE, JUDGE_COLORS, LANES } from '../config.js';
 import { calibration, judgeMultiplier } from './calibration.js';
 import { laneMetrics, hitY } from '../utils/canvas.js';
 import { spawnHitParticles, spawnMissParticles, spawnShockwave } from '../fx/particles.js';
-import { playHitSound } from './hitsound.js';
+import { playHitSound, startHoldSound, stopHoldSound } from './hitsound.js';
 import { recordEvent } from './replay.js';
 import { showJudge, showCombo, showHoldToast } from '../fx/toasts.js';
 import { updateHUD } from '../ui/hud.js';
@@ -124,7 +124,9 @@ export function pressDown(lane) {
     showCombo(state.combo);
     showHoldToast();
     spawnHitParticles(lane, true, holdResult.perfect ? 'PERFECT' : 'GOOD');
-    playHitSound(state.botMode ? 'bot' : 'player', holdResult.perfect ? 'perfect' : 'good');
+    // v1.24.3: legato — start a continuous sustain tone that lasts the
+    // whole HOLD. No separate tap sound at the start, no "end tap" either.
+    startHoldSound(state.botMode ? 'bot' : 'player', lane);
     // Game feel: subtle shake + lane flash on hold start
     shake(holdResult.perfect ? 3 : 1.5, 0.18);
     // Note: the tier label passed to showJudge was already localised in
@@ -208,6 +210,9 @@ export function finishHold(lane, success) {
   n.holding = false;
   n.judged = true;
   holdBars[lane].style.width = '0%';
+  // v1.24.3: stop the legato sustain that was started when this HOLD began.
+  // On success it fades softly; on break it cuts harder for feedback.
+  stopHoldSound(state.botMode ? 'bot' : 'player', lane, success ? 0.08 : 0.03);
   if (success) {
     state.holdsOk++;
     const bonus = SCORE.HOLD_COMPLETE_BASE + Math.floor((n.endTime - n.time) * SCORE.HOLD_COMPLETE_PER_SEC);
@@ -215,7 +220,6 @@ export function finishHold(lane, success) {
     state.combo++; if (state.combo > state.maxCombo) state.maxCombo = state.combo;
     showJudge(t('judge.holdOk'), JUDGE_COLORS.HOLD_OK);
     spawnHitParticles(lane, true, 'PERFECT');
-    playHitSound(state.botMode ? 'bot' : 'player', 'hold');
     shake(2.5, 0.22);
     flashHitLine(JUDGE_COLORS.HOLD_OK, 0.65);
     flashLane(lane, JUDGE_COLORS.HOLD_OK, 1);

@@ -17,7 +17,7 @@ import { resetPerf, summarisePerf } from '../utils/perf.js';
 import { attachAnalyser, detachAnalyser } from '../fx/musicReactive.js';
 import { t, getLocale } from '../i18n/i18n.js';
 import { scheduleCountIn } from './warmup.js';
-import { bindHitSoundOutput } from './hitsound.js';
+import { bindHitSoundOutput, stopAllHoldSounds } from './hitsound.js';
 import { startReplayRecording, stopReplayRecording } from './replay.js';
 import { startBot, stopBot } from './bot.js';
 
@@ -129,6 +129,7 @@ export async function resumeGame() {
 async function stopAudio() {
   stopBot();
   stopReplayRecording();
+  stopAllHoldSounds();
   detachAnalyser();
   if (state.sourceNode) {
     try { state.sourceNode.onended = null; } catch {}
@@ -178,6 +179,7 @@ export function endGame() {
   state.gameRunning = false;
   state.paused = false;
   stopBot();
+  stopAllHoldSounds();
   const replayJson = stopReplayRecording();
   if (replayJson) state.lastReplay = replayJson;
   // Stop audio so onended can't fire again for a stale source
