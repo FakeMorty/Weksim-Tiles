@@ -85,6 +85,45 @@ export function bindStats() {
     const safeName = (state.fileName || 'track').replace(/[^\w.-]+/g, '_').replace(/\.[a-z0-9]+$/i, '');
     downloadMapFile(json, safeName + '.' + (state.currentDifficulty || 'normal') + '.wtmap.json');
   });
+
+  // Etap E (v1.24): Export replay + video
+  const exportReplayBtn = document.getElementById('exportReplayBtn');
+  exportReplayBtn?.addEventListener('click', async () => {
+    if (!state.lastReplay) {
+      alert(t('menu.noReplayToExport'));
+      return;
+    }
+    const { downloadReplay } = await import('../game/replay.js');
+    const safeName = (state.fileName || 'track').replace(/[^\w.-]+/g, '_').replace(/\.[a-z0-9]+$/i, '');
+    downloadReplay(state.lastReplay,
+      safeName + '.' + (state.currentDifficulty || 'normal') + '.wtreplay.json');
+  });
+
+  const exportVideoBtn = document.getElementById('exportVideoBtn');
+  exportVideoBtn?.addEventListener('click', async () => {
+    if (!state.lastReplay) {
+      alert(t('menu.noReplayToExport'));
+      return;
+    }
+    const { startVideoExport } = await import('./videoExport.js');
+    try {
+      exportVideoBtn.disabled = true;
+      exportVideoBtn.textContent = t('menu.videoExporting');
+      await startVideoExport(state.lastReplay, (pct) => {
+        exportVideoBtn.textContent = t('menu.videoExportingPct', { pct });
+      });
+      exportVideoBtn.textContent = '✓ ' + t('menu.videoExported');
+    } catch (e) {
+      console.error(e);
+      alert(t('common.error') + ': ' + (e.message || e));
+      exportVideoBtn.textContent = '🎬 ' + t('results.exportVideo');
+    } finally {
+      setTimeout(() => {
+        exportVideoBtn.disabled = false;
+        exportVideoBtn.textContent = '🎬 ' + t('results.exportVideo');
+      }, 3500);
+    }
+  });
 }
 
 function renderStats() {

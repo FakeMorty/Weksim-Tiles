@@ -45,6 +45,12 @@ export const state = {
   lastAnalysis: null,             // full analyzer result — for map export
   pendingImportedMap: null,       // set by import UI, consumed on next play
 
+  // Etap E (v1.24): library / bot / replay
+  currentTrackId: null,      // active library entry id
+  botMode: false,             // true = autopilot plays this session
+  replayPlayback: null,       // when replaying, this holds the parsed replay JSON
+  lastReplay: null,           // most recent recorded replay JSON (for export)
+
   // Per-lane transient
   bullets: [],
   particles: [],

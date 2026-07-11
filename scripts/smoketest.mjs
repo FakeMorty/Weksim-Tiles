@@ -64,6 +64,11 @@ globalThis.localStorage = {
   setItem(k, v) { this._s[k] = String(v); },
   removeItem(k) { delete this._s[k]; },
 };
+globalThis.navigator = globalThis.navigator || { userAgent: 'Node', language: 'en', languages: ['en'] };
+if (!globalThis.crypto || !globalThis.crypto.subtle) {
+  try { Object.defineProperty(globalThis, 'crypto', { value: { subtle: { digest: () => Promise.resolve(new ArrayBuffer(20)) } }, configurable: true }); }
+  catch { /* modern node already has one */ }
+}
 
 const modules = [
   'src/config.js',
@@ -106,8 +111,18 @@ const modules = [
   'src/audio/density.js',
   'src/audio/percussive.js',
   'src/audio/beatTracking.js',
+  'src/audio/plp.js',
+  'src/audio/pitch.js',
+  'src/audio/envelope.js',
   'src/audio/mapgen.js',
   'src/audio/holds.js',
+  'src/audio/sources.js',
+  'src/audio/nmf.js',
+  'src/game/library.js',
+  'src/game/warmup.js',
+  'src/game/hitsound.js',
+  'src/game/bot.js',
+  'src/game/replay.js',
   'src/audio/cache.js',
   'src/audio/mapIO.js',
   'src/game/stats.js',
@@ -130,6 +145,8 @@ const modules = [
   'src/ui/pause.js',
   'src/ui/stats.js',
   'src/ui/language.js',
+  'src/ui/library.js',
+  'src/ui/videoExport.js',
   'src/ui/menu.js',
   'src/main.js',
 ];

@@ -16,6 +16,24 @@
   .subtitle{color:#7aa3b8;font-size:13px;margin-bottom:26px;letter-spacing:.12em;text-transform:uppercase;}
   .panel{width:min(760px,95vw); background: linear-gradient(180deg,#0b1124aa,#070a18cc);border:1px solid #1d2a4a; border-radius:18px; padding:24px 24px 20px; box-shadow:0 0 40px #0066ff18 inset, 0 10px 50px #0008;}
   .dropzone{border:1.8px dashed #2a4a7a; border-radius:14px; padding:28px 18px; text-align:center; cursor:pointer;transition:.2s; color:#88b8d8; background:#0a1230aa;}
+  /* Track library cards (Etap E v1.24) */
+  .lib-card{display:flex; align-items:center; gap:12px; padding:10px 12px; background:linear-gradient(180deg,#0b1330,#0a1024); border:1px solid #1c2c50; border-radius:12px; transition:.12s;}
+  .lib-card:hover{border-color:#2c5088; background:linear-gradient(180deg,#0e1740,#0a112b);}
+  .lib-card.selected{border-color:#00d0ff; background:linear-gradient(180deg,#0e2248,#0a1738); box-shadow:0 0 14px #00e5ff22 inset;}
+  .lib-num{font-family:'Orbitron',sans-serif; font-weight:800; color:#7efaff; font-size:18px; width:24px; text-align:center; opacity:.7;}
+  .lib-info{flex:1; min-width:0;}
+  .lib-title{font-weight:700; color:#eaffff; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .lib-sub{font-size:10px; color:#6a8fb0; margin-top:2px; letter-spacing:.06em;}
+  .lib-stars{color:#ffd93d; font-size:12px; letter-spacing:2px; text-shadow:0 0 8px #ffb63344;}
+  .lib-stars .off{color:#2a3450; text-shadow:none;}
+  .lib-actions{display:flex; gap:6px;}
+  .lib-btn{padding:7px 14px; border-radius:8px; font-family:'Orbitron',sans-serif; font-weight:600; font-size:11px; border:none; cursor:pointer; letter-spacing:.08em; text-transform:uppercase; transition:.12s;}
+  .lib-btn.play{background:linear-gradient(90deg,#00d9ff,#7b61ff); color:#02121a;}
+  .lib-btn.play:hover{filter:brightness(1.1);}
+  .lib-btn.bot{background:#1a2645; color:#9ecae8; border:1px solid #2a4c7a;}
+  .lib-btn.bot:hover{background:#22315a; color:#dfffff;}
+  .lib-btn.del{background:#2a1520; color:#c88; border:1px solid #4c2530; padding:7px 9px;}
+  .lib-btn.del:hover{background:#3a1830; color:#fff;}
   .dropzone:hover,.dropzone.dragover{border-color:#51f0ff; background:#0d1b44; color:#cfffff; box-shadow:0 0 22px #00eaff22 inset;}
   .dropzone strong{color:#eaffff}
   #fileInput{display:none}
@@ -163,8 +181,8 @@
   <div class="subtitle" id="menuSubtitle">neon tiles • shoot the beat</div>
   <div class="panel">
     <div class="dropzone" id="dropzone">
-      <strong data-i18n="menu.dropzoneMain">Drop your track here</strong><br><span data-i18n="menu.dropzoneSub">or click to pick MP3 / WAV / OGG / FLAC</span>
-      <input type="file" id="fileInput" accept="audio/*">
+      <strong data-i18n="menu.dropzoneMain">Drop your track here</strong><br><span data-i18n="menu.dropzoneSub">or click to pick MP3 / WAV / OGG / FLAC — multi-select supported</span>
+      <input type="file" id="fileInput" accept="audio/*" multiple>
       <div id="trackName"></div>
       <div class="small-tags">
         <div class="tag" data-i18n="menu.tagAutoBeatmap">Auto beatmap</div>
@@ -173,6 +191,14 @@
         <div class="tag" data-i18n="menu.tagTapHold">D F J K / tap & hold</div>
         <div class="tag" data-i18n="menu.tagOfflineAnalysis">offline analysis</div>
       </div>
+    </div>
+
+    <div id="libraryPanel" style="display:none; margin-top:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <div style="font-size:11px; color:#6a8fb0; text-transform:uppercase; letter-spacing:.08em;" data-i18n="menu.libraryHeader">Track library (this session)</div>
+        <button id="libClearBtn" style="background:#161a34; color:#8899c0; border:1px solid #2a3c66; border-radius:8px; padding:4px 10px; font-size:11px; cursor:pointer; font-family:'JetBrains Mono',monospace;" data-i18n="menu.libraryClear">Clear all</button>
+      </div>
+      <div id="libraryList" style="display:flex; flex-direction:column; gap:8px; max-height:280px; overflow-y:auto; padding-right:4px;"></div>
     </div>
 
     <div class="row">
@@ -251,6 +277,32 @@
         </select>
       </div>
       <div class="slider-box">
+        <label data-i18n="menu.nmf">NMF instrument refinement</label>
+        <select id="nmfModeSelect">
+          <option value="off" data-i18n="menu.nmfOff">Off (fastest)</option>
+          <option value="fast" data-i18n="menu.nmfFast">Fast (+2s, weak PCs)</option>
+          <option value="auto" selected data-i18n="menu.nmfAuto">Auto (+4s, recommended)</option>
+          <option value="quality" data-i18n="menu.nmfQuality">Quality (+6s, best)</option>
+        </select>
+      </div>
+      <div class="slider-box">
+        <label><span data-i18n="menu.hitSound">Hit sound (you)</span></label>
+        <select id="hitSoundSelect">
+          <option value="off" data-i18n="menu.hitSoundOff">Off</option>
+          <option value="click" data-i18n="menu.hitSoundClick">Click</option>
+          <option value="kick" data-i18n="menu.hitSoundKick">Kick</option>
+          <option value="snare" data-i18n="menu.hitSoundSnare">Snare</option>
+          <option value="custom" data-i18n="menu.hitSoundCustom">Custom sample…</option>
+        </select>
+        <input type="file" id="hitSoundFile" accept="audio/*" style="display:none">
+        <div id="hitSoundStatus" style="font-size:10px;color:#5da6c8;margin-top:4px"></div>
+      </div>
+      <div class="slider-box">
+        <label><span data-i18n="menu.warmup">Warmup count-in</span> <span id="warmupBeatsVal">4</span></label>
+        <input type="range" id="warmupBeats" min="0" max="8" step="1" value="4">
+        <small style="color:#5a8dad;font-size:10px" data-i18n="menu.warmupHint">0 = off, 4 = one bar</small>
+      </div>
+      <div class="slider-box">
         <label data-i18n="meta.langLabel">Language</label>
         <select id="languageSelect"></select>
       </div>
@@ -294,6 +346,10 @@
     <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
       <button class="play-btn" id="againBtn" style="flex:2" data-i18n="results.playAgain">Play again</button>
       <button class="pause-btn" id="exportMapBtn" style="flex:1;margin:0" data-i18n="results.exportMap">📤 Export map</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="pause-btn" id="exportReplayBtn" style="flex:1;margin:0" data-i18n="results.exportReplay">💾 Export replay (JSON)</button>
+      <button class="pause-btn" id="exportVideoBtn" style="flex:1;margin:0" data-i18n="results.exportVideo">🎬 Export replay as video</button>
     </div>
     <div class="ghost" style="margin-top:12px" data-i18n="results.footer">Auto BPM sync on. Change "Lead" Slow/Normal/Fast for comfort.</div>
   </div>
@@ -372,6 +428,26 @@
       <label data-i18n="pause.volumeLabel">🔊 Volume</label>
       <input type="range" id="pauseVolume" min="0" max="100" step="1" value="55">
       <span class="val" id="pauseVolumeVal">55%</span>
+    </div>
+    <div class="pause-vol">
+      <label data-i18n="pause.hitSoundLabel">🥁 Your hit sound</label>
+      <select id="pauseHitSound" style="flex:1;background:#0a1a34;color:#bfefff;border:1px solid #254567;border-radius:7px;padding:6px;font-family:'JetBrains Mono',monospace;font-size:12px">
+        <option value="off">Off</option>
+        <option value="click">Click</option>
+        <option value="kick">Kick</option>
+        <option value="snare">Snare</option>
+        <option value="custom">Custom</option>
+      </select>
+    </div>
+    <div class="pause-vol" id="pauseBotHitRow" style="display:none">
+      <label data-i18n="pause.botHitSoundLabel">🤖 Bot hit sound</label>
+      <select id="pauseBotHitSound" style="flex:1;background:#0a1a34;color:#bfefff;border:1px solid #254567;border-radius:7px;padding:6px;font-family:'JetBrains Mono',monospace;font-size:12px">
+        <option value="off">Off</option>
+        <option value="click">Click</option>
+        <option value="kick">Kick</option>
+        <option value="snare">Snare</option>
+        <option value="custom">Custom</option>
+      </select>
     </div>
     <button class="pause-btn primary" id="pauseContinueBtn" data-i18n="pause.continue">▶ Continue</button>
     <button class="pause-btn" id="pauseRestartBtn" data-i18n="pause.restart">↻ Restart song</button>

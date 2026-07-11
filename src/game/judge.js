@@ -6,6 +6,8 @@ import { JUDGE, SCORE, JUDGE_COLORS, LANES } from '../config.js';
 import { calibration, judgeMultiplier } from './calibration.js';
 import { laneMetrics, hitY } from '../utils/canvas.js';
 import { spawnHitParticles, spawnMissParticles, spawnShockwave } from '../fx/particles.js';
+import { playHitSound } from './hitsound.js';
+import { recordEvent } from './replay.js';
 import { showJudge, showCombo, showHoldToast } from '../fx/toasts.js';
 import { updateHUD } from '../ui/hud.js';
 import { shake, zoomPulse, tiltPulse } from '../render/camera.js';
@@ -87,6 +89,7 @@ function classifyHoldStart(absDiff, mult) {
 export function pressDown(lane) {
   if (state.keysDown[lane]) return;
   state.keysDown[lane] = true;
+  recordEvent('down', lane, state.audioCtx?.currentTime);
   laneKeysEls[lane].classList.add('active');
   laneKeysEls[lane].classList.add('holding');
   fireBullet(lane, false);
@@ -117,6 +120,7 @@ export function pressDown(lane) {
     showCombo(state.combo);
     showHoldToast();
     spawnHitParticles(lane, true, holdResult.perfect ? 'PERFECT' : 'GOOD');
+    playHitSound(state.botMode ? 'bot' : 'player', holdResult.perfect ? 'perfect' : 'good');
     // Game feel: subtle shake + lane flash on hold start
     shake(holdResult.perfect ? 3 : 1.5, 0.18);
     // Note: the tier label passed to showJudge was already localised in
@@ -148,6 +152,8 @@ export function pressDown(lane) {
     showJudge(tierLabel, tapResult.color);
     showCombo(state.combo);
     spawnHitParticles(lane, false, tapResult.tier);
+    playHitSound(state.botMode ? 'bot' : 'player',
+      (tapResult.tier === 'MARVELOUS' || tapResult.tier === 'PERFECT') ? 'perfect' : 'good');
     // Game feel per tier
     flashLane(lane, tapResult.color, 1);
     if (tapResult.tier === 'MARVELOUS') {
@@ -180,6 +186,7 @@ export function pressDown(lane) {
 
 export function pressUp(lane) {
   state.keysDown[lane] = false;
+  recordEvent('up', lane, state.audioCtx?.currentTime);
   laneKeysEls[lane].classList.remove('active');
   laneKeysEls[lane].classList.remove('holding');
   const hn = state.activeHold[lane];
@@ -204,6 +211,7 @@ export function finishHold(lane, success) {
     state.combo++; if (state.combo > state.maxCombo) state.maxCombo = state.combo;
     showJudge(t('judge.holdOk'), JUDGE_COLORS.HOLD_OK);
     spawnHitParticles(lane, true, 'PERFECT');
+    playHitSound(state.botMode ? 'bot' : 'player', 'hold');
     shake(2.5, 0.22);
     flashHitLine(JUDGE_COLORS.HOLD_OK, 0.65);
     flashLane(lane, JUDGE_COLORS.HOLD_OK, 1);

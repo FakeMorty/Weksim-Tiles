@@ -50,6 +50,7 @@ export async function analyzeTrack(audioBuffer, modeStr, sens, opts) {
         mode: modeStr,
         difficulty: opts.difficulty || 'normal',
         hpssMode: opts.hpssMode || 'hard',
+        nmfMode: opts.nmfMode || 'auto',
         sens,
         holdMode: opts.holdMode ?? 1,
         holdEnable: !!opts.holdEnable,
@@ -94,6 +95,8 @@ export async function analyzeTrack(audioBuffer, modeStr, sens, opts) {
         sens,
         // Etap 2: hpssMode = 'off' | 'hard' | 'soft' | 'iterative'
         hpssMode: opts.hpssMode ?? (opts.hpssLite === false ? 'off' : 'hard'),
+        // Etap D (v1.23): nmfMode = 'off' | 'fast' | 'auto' | 'quality'
+        nmfMode: opts.nmfMode ?? 'auto',
         snapSubdivision: preset.snapSubdivision,
       },
       [mono.buffer]
@@ -120,6 +123,8 @@ export async function analyzeTrack(audioBuffer, modeStr, sens, opts) {
       chordProb: opts.dual ? preset.chordProb : 0,
       smartLane: opts.smartLane,
       difficulty: opts.difficulty || 'normal',
+      downbeatIndices: result.downbeatIndices || [],
+      downbeatConfidence: result.downbeatConfidence || 0,
     }
   );
 
@@ -131,6 +136,8 @@ export async function analyzeTrack(audioBuffer, modeStr, sens, opts) {
     bpmStable: result.bpmStable,
     bpmDrift: result.bpmDrift,
     beatTimes: result.beatTimes,
+    downbeatIndices: result.downbeatIndices,
+    downbeatConfidence: result.downbeatConfidence,
     times: result.onsetTimes,
     analysisMs: result.analysisMs,
     rawOnsetCount: result.onsetTimes.length,
@@ -154,11 +161,14 @@ export async function analyzeTrack(audioBuffer, modeStr, sens, opts) {
 // Build note events (time, endTime, isHold) from the worker output.
 function buildEvents(res, duration, modeStr, opts) {
   const {
-    onsetTimes, onsetStrengths, novelty, framesPerSec, bpm,
-    harmonicEnvelopes, beatTimes,
+    onsetTimes, onsetStrengths, bandsAtOnset, novelty, framesPerSec, bpm,
+    harmonicEnvelopes, beatTimes, pitchRegions,
+    onsetSources,        // Etap C (v1.22): per-onset source tag
   } = res;
 
-  // Build onset objects with strength
+  // Build onset objects with strength + per-band energy (kick/snare/hihat
+  // classification happens in mapgen using these). Etap C: source tag from
+  // separated instrument streams (kick/snare/hihat/melody) if available.
   const onsets = [];
   for (let i = 0; i < onsetTimes.length; i++) {
     const t = onsetTimes[i];
@@ -166,16 +176,23 @@ function buildEvents(res, duration, modeStr, opts) {
     onsets.push({
       time: t,
       strength: onsetStrengths ? onsetStrengths[i] : 1,
+      bands: bandsAtOnset ? bandsAtOnset[i] : null,
+      source: onsetSources ? onsetSources[i] : null,
     });
   }
 
-  // Etap 3: hold detection on harmonic energy envelopes (hysteresis, beat-snap,
-  // close-onset merging, vocal-accent flagging).
+  // Etap 3 + B (v1.21): hold detection via harmonic-envelope hysteresis
+  // PLUS pitch-region matching (stable YIN pitch = guaranteed HOLD with
+  // known end-time — much more accurate than envelope alone).
   if (harmonicEnvelopes) {
     return detectHolds(
       onsets, harmonicEnvelopes, framesPerSec,
       beatTimes || [], bpm, modeStr,
-      { holdEnable: opts.holdEnable, holdMode: opts.holdMode }
+      {
+        holdEnable: opts.holdEnable,
+        holdMode: opts.holdMode,
+        pitchRegions: pitchRegions || [],
+      }
     );
   }
 
@@ -208,6 +225,7 @@ function buildEvents(res, duration, modeStr, opts) {
       endTime: o.time + holdDur,
       isHold: holdDur >= params.minH,
       strength: o.strength,
+      source: o.source ?? null,
     });
   }
   return events;

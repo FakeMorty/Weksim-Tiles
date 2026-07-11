@@ -6,6 +6,8 @@ import { startPlay } from '../game/loop.js';
 import { APP_VERSION } from '../config.js';
 import { settings } from '../game/settings.js';
 import { t, onLocaleChange } from '../i18n/i18n.js';
+import { addTrack, getTrack, updateTrack, difficultyStars, guessGenreFromBpm } from '../game/library.js';
+import { bindLibrary, render as renderLibrary } from './library.js';
 
 export function bindMenu() {
   const applySubtitle = () => {
@@ -65,9 +67,15 @@ export function bindMenu() {
   dropzone.addEventListener('drop', e => {
     e.preventDefault();
     dropzone.classList.remove('dragover');
-    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    handleFiles(Array.from(e.dataTransfer.files || []));
   });
-  fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+  fileInput.addEventListener('change', e => { handleFiles(Array.from(e.target.files || [])); });
+
+  // Library card handlers
+  bindLibrary({
+    onPlay: (track) => { selectAndPlay(track, { bot: false }); },
+    onBot:  (track) => { selectAndPlay(track, { bot: true  }); },
+  });
 
   document.getElementById('playBtn').addEventListener('click', startGameSequence);
   document.getElementById('againBtn').addEventListener('click', async () => {
@@ -80,34 +88,82 @@ export function bindMenu() {
   });
 }
 
-async function handleFile(file) {
-  state.fileName = file.name;
-  document.getElementById('trackName').textContent = t('menu.fileDecoding', {
-    name: file.name,
-    size: (file.size / 1024 / 1024).toFixed(1),
-  });
-  updatePlayButton();
+async function handleFiles(files) {
+  if (!files || files.length === 0) return;
   if (!state.audioCtx) state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const ab = await file.arrayBuffer();
-  state.fileBytes = new Uint8Array(ab.slice(0));
-  try {
-    const { sha1 } = await import('../audio/cache.js');
-    state.fileHash = await sha1(state.fileBytes);
-  } catch { state.fileHash = ''; }
-  try {
-    state.audioBuffer = await state.audioCtx.decodeAudioData(ab.slice(0));
-    document.getElementById('trackName').textContent = t('menu.fileReady', {
-      name: file.name,
-      duration: state.audioBuffer.duration.toFixed(1),
-      sr: (state.audioBuffer.sampleRate / 1000).toFixed(0),
+
+  const trackNameEl = document.getElementById('trackName');
+  let successCount = 0;
+  let firstAddedTrack = null;
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    trackNameEl.textContent = t('menu.fileDecoding', {
+      name: files.length > 1 ? `[${i+1}/${files.length}] ${file.name}` : file.name,
+      size: (file.size / 1024 / 1024).toFixed(1),
     });
-    document.getElementById('detectedBpmTag').style.display = 'none';
-    updatePlayButton();
-  } catch (err) {
-    document.getElementById('trackName').textContent = t('menu.fileError', { err: String(err) });
-    state.audioBuffer = null;
-    updatePlayButton();
+    try {
+      const ab = await file.arrayBuffer();
+      const fileBytes = new Uint8Array(ab.slice(0));
+      let fileHash = '';
+      try {
+        const { sha1 } = await import('../audio/cache.js');
+        fileHash = await sha1(fileBytes);
+      } catch { /* non-fatal */ }
+      const audioBuffer = await state.audioCtx.decodeAudioData(ab.slice(0));
+      const id = addTrack({
+        name: file.name,
+        size: file.size,
+        duration: audioBuffer.duration,
+        sampleRate: audioBuffer.sampleRate,
+        audioBuffer,
+        fileBytes,
+        fileHash,
+      });
+      if (!firstAddedTrack) firstAddedTrack = getTrack(id);
+      successCount++;
+    } catch (err) {
+      console.warn('Failed to decode ' + file.name, err);
+    }
   }
+
+  if (successCount === 0) {
+    trackNameEl.textContent = t('menu.fileError', { err: 'no valid audio' });
+    return;
+  }
+
+  // Auto-select first newly-added track as current (matches old single-file behaviour)
+  if (firstAddedTrack) {
+    setCurrentTrack(firstAddedTrack);
+  }
+  if (successCount === 1) {
+    const tr = firstAddedTrack;
+    trackNameEl.textContent = t('menu.fileReady', {
+      name: tr.name,
+      duration: tr.duration.toFixed(1),
+      sr: (tr.sampleRate / 1000).toFixed(0),
+    });
+  } else {
+    trackNameEl.textContent = t('menu.libraryLoaded', { n: successCount });
+  }
+  document.getElementById('detectedBpmTag').style.display = 'none';
+  updatePlayButton();
+  renderLibrary();
+}
+
+function setCurrentTrack(track) {
+  state.currentTrackId = track.id;
+  state.fileName = track.name;
+  state.audioBuffer = track.audioBuffer;
+  state.fileBytes = track.fileBytes;
+  state.fileHash = track.fileHash || '';
+  renderLibrary();
+}
+
+// Called from library card "Play" / "Bot" buttons
+async function selectAndPlay(track, opts) {
+  setCurrentTrack(track);
+  state.botMode = !!opts.bot;
+  await startGameSequence();
 }
 
 export function updatePlayButton() {
@@ -148,11 +204,16 @@ async function startGameSequence() {
       stft: 'STFT',
       hpss: 'HPSS (' + settings.hpssMode + ')',
       'hpss-lite': 'Percussive isolation',
+      pitch: 'Pitch tracking (YIN)',
+      sources: 'Source separation',
+      nmf: 'NMF refinement (' + settings.nmfMode + ')',
       flux: 'Multiband flux',
       novelty: 'Novelty',
       onsets: 'Onset picking',
       bpm: 'BPM autocorr + tempogram',
       'beat-track': 'Beat tracking (Ellis DP)',
+      plp: 'PLP (local tempo)',
+      downbeats: 'Downbeat detection',
       'beat-snap': 'Beat snap',
       done: 'Finalize',
     };
@@ -166,6 +227,7 @@ async function startGameSequence() {
       analysis = await analyzeTrack(state.audioBuffer, state.mode, sens, {
         holdEnable, holdMode, dual, smartLane, difficulty,
         hpssMode: settings.hpssMode,
+        nmfMode: settings.nmfMode,
         fileBytes: state.fileBytes,
         fileName: state.fileName,
         onProgress: (p, stage) => {
@@ -184,6 +246,19 @@ async function startGameSequence() {
     state.currentSens = sens;
     state.lastAnalysis = analysis;
     state.holdsTotal = state.notes.filter(n => n.isHold).length;
+
+    // Update library entry with BPM + star rating so the card shows them next time
+    if (state.currentTrackId != null) {
+      const nps = state.audioBuffer.duration > 0
+        ? state.notes.length / state.audioBuffer.duration : 0;
+      updateTrack(state.currentTrackId, {
+        bpm: state.currentBpm,
+        difficulty: difficultyStars(state.currentBpm, nps),
+        genre: guessGenreFromBpm(state.currentBpm),
+        analysis,
+      });
+      renderLibrary();
+    }
 
     const bpmAuto = document.getElementById('bpmAuto').checked;
     const fallSpeedEl = document.getElementById('fallSpeed');

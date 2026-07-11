@@ -21,6 +21,8 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Node 24-native versions of the GitHub Actions used here — silences the
+      # "Node.js 20 is deprecated" warning that appeared in Sep 2025.
       - uses: actions/checkout@v5
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

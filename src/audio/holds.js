@@ -76,7 +76,14 @@ function smoothBox(sig, halfWin) {
  * @param {number[]} beatTimes  from beat tracking
  * @param {number} bpm
  * @param {string} modeStr  'drums' | 'classic' | 'vocal'
- * @param {object} opts     { holdEnable, holdMode (0=off,1=auto,2=lots) }
+ * @param {object} opts     { holdEnable, holdMode (0=off,1=auto,2=lots), pitchRegions }
+ *
+ * Etap B (v1.21): when `opts.pitchRegions` is provided (from YIN tracker),
+ * onsets whose start-time aligns with a stable-pitch region become
+ * guaranteed HOLDs with the exact end-time of that region — MUCH more
+ * accurate than the envelope-hysteresis fallback, which used to trigger
+ * on any sustained background noise.
+ *
  * @returns {Array<{time, endTime, isHold, strength, isVocalAccent}>}
  */
 export function detectHolds(onsets, envelopes, framesPerSec,
@@ -84,6 +91,7 @@ export function detectHolds(onsets, envelopes, framesPerSec,
   const holdEnable = opts.holdEnable !== false;
   const holdBias = opts.holdMode ?? 1; // 0=off, 1=auto, 2=lots
   const beatLen = bpm > 40 ? 60 / bpm : 0.5;
+  const pitchRegions = opts.pitchRegions || [];
 
   // Per-mode parameters + which envelope to use
   const params = modeStr === 'vocal'
@@ -116,12 +124,33 @@ export function detectHolds(onsets, envelopes, framesPerSec,
     const nextT = onsets[i + 1]?.time ?? Infinity;
     let holdDur = 0;
     let isVocalAccent = false;
+    let holdSource = 'none'; // 'pitch' | 'envelope' | 'none' — for debugging
 
     // Check for vocal accent (short but strong spike in vocal band)
     const f0 = timeToFrame(t);
     if (eVocalSmooth[f0] > vocalMedian * 2.5) isVocalAccent = true;
 
-    if (holdEnable) {
+    // Etap B (v1.21): FIRST check pitch regions. If this onset lands at the
+    // start of a stable-pitch region, we KNOW it's a held note and we know
+    // exactly where it ends — much more accurate than envelope guessing.
+    if (holdEnable && pitchRegions.length) {
+      for (const region of pitchRegions) {
+        // Region must start within ±80ms of the onset (tolerates snap slop)
+        if (region.startSec < t - 0.05) continue;
+        if (region.startSec > t + 0.08) break; // regions are sorted
+        // Only take stable ones (weak vibrato is fine, wild pitch drift isn't)
+        if (region.stability < 0.35) continue;
+        const regionDur = region.endSec - region.startSec;
+        // Trim if it would overlap the next onset
+        const maxAllowed = Math.min(params.maxHold, nextT - t - 0.12);
+        if (maxAllowed < params.minHold) break; // no room for a hold here
+        holdDur = Math.min(regionDur, maxAllowed);
+        holdSource = 'pitch';
+        break;
+      }
+    }
+
+    if (holdEnable && holdSource === 'none') {
       // Look at harmonic energy first. If clearly above threshold, this IS
       // a sustain — probability only gates borderline cases.
       const energyRatio = eSmooth[f0] / HIGH_THR;
@@ -191,6 +220,8 @@ export function detectHolds(onsets, envelopes, framesPerSec,
       endTime: t + holdDur,
       isHold: holdDur >= params.minHold,
       strength: onsets[i].strength ?? 1,
+      bands: onsets[i].bands ?? null,
+      source: onsets[i].source ?? null,   // Etap C: propagate source tag
       isVocalAccent,
     });
   }

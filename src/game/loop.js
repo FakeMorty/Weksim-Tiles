@@ -16,6 +16,10 @@ import { settings } from './settings.js';
 import { resetPerf, summarisePerf } from '../utils/perf.js';
 import { attachAnalyser, detachAnalyser } from '../fx/musicReactive.js';
 import { t, getLocale } from '../i18n/i18n.js';
+import { scheduleCountIn } from './warmup.js';
+import { bindHitSoundOutput } from './hitsound.js';
+import { startReplayRecording, stopReplayRecording } from './replay.js';
+import { startBot, stopBot } from './bot.js';
 
 let lastFrame = performance.now();
 
@@ -61,14 +65,32 @@ export function startPlay() {
   }
   state.gainNode.gain.value = settings.volume;
 
+  // Etap E (v1.24): route hit sounds through the same gainNode so master
+  // volume affects them too.
+  bindHitSoundOutput(state.audioCtx, state.gainNode);
+
   state.sourceNode = state.audioCtx.createBufferSource();
   state.sourceNode.buffer = state.audioBuffer;
   state.sourceNode.connect(state.gainNode);
   // Etap 9: live spectrum tap for reactive visuals
   attachAnalyser(state.audioCtx, state.gainNode);
-  const startAt = state.audioCtx.currentTime + 0.18;
+
+  // Etap E (v1.24): warmup / count-in
+  let firstTickAt = state.audioCtx.currentTime + 0.18;
+  let startAt = firstTickAt;
+  if (settings.warmup && state.currentBpm > 40 && !state.replayPlayback) {
+    const beats = settings.warmupBeats || 4;
+    startAt = scheduleCountIn(state.audioCtx, state.gainNode, state.currentBpm, firstTickAt, 0.35, beats);
+  }
   state.sourceNode.start(startAt);
   state.startTime = startAt;
+
+  // Etap E (v1.24): start replay recorder (records all judgements + inputs)
+  startReplayRecording(state);
+  // If bot mode requested, launch the autopilot after the count-in
+  if (state.botMode && !state.replayPlayback) {
+    startBot(state, startAt);
+  }
   // Capture reference so onended only fires endGame for THIS source, not
   // any stale one that was still winding down.
   const thisSource = state.sourceNode;
@@ -88,6 +110,9 @@ export async function pauseGame() {
   state.pauseStart = state.audioCtx.currentTime;
   try { await state.audioCtx.suspend(); } catch {}
   document.getElementById('pauseScreen').style.display = 'flex';
+  // Etap E: show bot hit-sound switcher only when bot is playing this run
+  const botRow = document.getElementById('pauseBotHitRow');
+  if (botRow) botRow.style.display = state.botMode ? 'flex' : 'none';
 }
 
 export async function resumeGame() {
@@ -102,6 +127,8 @@ export async function resumeGame() {
 
 // Fully stop the current playback. Safe to call from any state.
 async function stopAudio() {
+  stopBot();
+  stopReplayRecording();
   detachAnalyser();
   if (state.sourceNode) {
     try { state.sourceNode.onended = null; } catch {}
@@ -150,6 +177,9 @@ export function endGame() {
   if (!state.gameRunning) return; // don't fire twice
   state.gameRunning = false;
   state.paused = false;
+  stopBot();
+  const replayJson = stopReplayRecording();
+  if (replayJson) state.lastReplay = replayJson;
   // Stop audio so onended can't fire again for a stale source
   detachAnalyser();
   if (state.sourceNode) {
