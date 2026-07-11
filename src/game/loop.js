@@ -154,6 +154,7 @@ export async function restartCurrent() {
     n.holdProgress = 0;
   }
   state._notesCursor = 0;
+  state._missCursor = 0;
   startPlay();
 }
 
@@ -304,9 +305,23 @@ function loop(now) {
 
   render(tRender, dt);
 
+  // v1.24.5: cursor-based miss scan instead of iterating all notes every frame.
+  // Notes are sorted by time; once a note is past miss window we can advance.
+  // Old code = O(N) per frame → 60 000 ops/sec on 1000-note track.
   const missWindow = JUDGE.MISS * judgeMultiplier();
-  state.notes.forEach(n => {
-    if (n.judged) return;
+  const notes = state.notes;
+  const missCursor = state._missCursor || 0;
+  let newCursor = missCursor;
+  for (let i = missCursor; i < notes.length; i++) {
+    const n = notes[i];
+    // If this note is still in the future beyond miss window, stop scanning.
+    if (n.time > tJudge - missWindow && (!n.isHold || n.endTime > tJudge + JUDGE.HOLD_LATE_FORCE)) {
+      break;
+    }
+    if (n.judged) {
+      if (i === newCursor) newCursor++;
+      continue;
+    }
     if (!n.isHold) {
       if (tJudge - n.time > missWindow) {
         n.judged = true; state.combo = 0; state.misses++;
@@ -330,7 +345,9 @@ function loop(now) {
         if (state.activeHold[lane] === n) finishHold(lane, true);
       }
     }
-  });
+    if (i === newCursor) newCursor++;
+  }
+  state._missCursor = newCursor;
 
   if (state.audioBuffer && songTime() > state.audioBuffer.duration + 0.85) {
     endGame();

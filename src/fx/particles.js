@@ -121,6 +121,13 @@ export function spawnShockwave(lane, color = '#fff4a3') {
 
 // Update + batched render. Renderer calls renderParticles(ctx, dt) instead of
 // iterating state.particles directly.
+//
+// v1.24.5: recycle the bucket Map + arrays instead of allocating per frame.
+// GC churn was the biggest hidden cost on dense trails (500 particles × 60fps
+// = 30 000 Map/array allocations per second → periodic ~5-8ms hitches).
+const _bucketMap = new Map();
+const _bucketArrays = new Map(); // color → reusable array
+
 export function updateAndRenderParticles(ctx, dt) {
   // Update
   for (let i = 0; i < MAX_PARTICLES; i++) {
@@ -135,26 +142,34 @@ export function updateAndRenderParticles(ctx, dt) {
     if (p.life <= 0) p.active = false;
   }
 
-  // Batch render by colour to minimise state changes.
-  // Group into small buckets.
-  const buckets = new Map(); // color → array of active particles
+  // Reset bucket lengths (keep arrays, avoid GC)
+  for (const arr of _bucketArrays.values()) arr.length = 0;
+  _bucketMap.clear();
+
   for (let i = 0; i < MAX_PARTICLES; i++) {
     const p = pool[i];
     if (!p.active) continue;
-    let arr = buckets.get(p.color);
-    if (!arr) { arr = []; buckets.set(p.color, arr); }
+    let arr = _bucketMap.get(p.color);
+    if (!arr) {
+      arr = _bucketArrays.get(p.color);
+      if (!arr) { arr = []; _bucketArrays.set(p.color, arr); }
+      _bucketMap.set(p.color, arr);
+    }
     arr.push(p);
   }
 
-  const useGlow = !fxLow();
-  for (const [color, arr] of buckets) {
+  // v1.24.5: particle glow only on high FX (was on medium too — expensive).
+  const useGlow = fxHigh();
+  for (const [color, arr] of _bucketMap) {
+    if (arr.length === 0) continue;
     ctx.save();
     ctx.fillStyle = color;
     if (useGlow) {
       ctx.shadowColor = color;
       ctx.shadowBlur = 8;
     }
-    for (const p of arr) {
+    for (let k = 0; k < arr.length; k++) {
+      const p = arr[k];
       ctx.globalAlpha = p.alpha;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);

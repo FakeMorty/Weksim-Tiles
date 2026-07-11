@@ -15,7 +15,19 @@ globalThis.window = {
 globalThis.document = {
   documentElement: { lang: 'en', dir: 'ltr' },
   querySelectorAll: () => [],
-  createElement: () => ({ appendChild(){}, setAttribute(){}, addEventListener(){}, style:{}, textContent:'', innerHTML:'' }),
+  createElement: () => ({
+    appendChild(){}, setAttribute(){}, addEventListener(){}, style:{},
+    textContent:'', innerHTML:'', width: 0, height: 0,
+    // createElement('canvas').getContext(...) — used by prerendered grid (v1.24.5)
+    getContext: () => ({
+      setTransform() {}, clearRect() {}, save() {}, restore() {},
+      fillRect() {}, strokeRect() {}, drawImage() {},
+      set fillStyle(v) {}, get fillStyle() { return '#000'; },
+      set globalAlpha(v) {}, get globalAlpha() { return 1; },
+      createLinearGradient: () => ({ addColorStop() {} }),
+      createRadialGradient: () => ({ addColorStop() {} }),
+    }),
+  }),
   getElementById() {
     return {
       style: {},

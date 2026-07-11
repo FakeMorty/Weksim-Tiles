@@ -73,6 +73,7 @@ export function resetPlayState() {
   state.bullets.length = 0;
   state.particles.length = 0;
   state._notesCursor = 0;
+  state._missCursor = 0;
   for (let i = 0; i < LANES; i++) {
     state.keysDown[i] = false;
     state.activeHold[i] = null;

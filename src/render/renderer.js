@@ -1,5 +1,8 @@
 // Main renderer. Optimised for weak GPUs: cached gradients, DPR downscaling,
 // simplified draw calls on low FX, note cursor for O(k) visibility scan.
+//
+// v1.24.5: aggressive perf pass — beam gradient cache, prerendered grid,
+// fewer note trails, reduced shadowBlur on medium, particle map recycling.
 
 import { state } from '../game/state.js';
 import { view, laneMetrics, hitY, roundRect } from '../utils/canvas.js';
@@ -28,9 +31,42 @@ function getLaneGrad(ctx, x, H) {
   laneGradH = H;
   return g;
 }
+
+// v1.24.5: cache the auto-fire beam gradient per (bx, hy). Was recreated
+// 4× per frame (once per lane). Small Map, cleared on resize.
+const beamGradMap = new Map();
+function getBeamGrad(ctx, bx, hy) {
+  const key = ((bx | 0) * 10000) + (hy | 0);
+  let g = beamGradMap.get(key);
+  if (g) return g;
+  g = ctx.createLinearGradient(bx, hy, bx, 0);
+  g.addColorStop(0, '#c9ffff');
+  g.addColorStop(1, 'rgba(120,80,255,0)');
+  beamGradMap.set(key, g);
+  return g;
+}
+
+// v1.24.5: prerendered background grid — was 40+ fillRects per frame.
+let gridCanvas = null;
+let gridW = 0, gridH = 0;
+function getGridCanvas(W, H) {
+  if (gridCanvas && gridW === W && gridH === H) return gridCanvas;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const gctx = c.getContext('2d');
+  gctx.globalAlpha = 0.07;
+  gctx.fillStyle = '#0c1c3a';
+  for (let y = 0; y < H; y += 46) gctx.fillRect(0, y, W, 1);
+  gridCanvas = c;
+  gridW = W; gridH = H;
+  return c;
+}
+
 export function invalidateGradCache() {
   laneGradCache = null;
   vignetteGrad = null;
+  beamGradMap.clear();
+  gridCanvas = null;
   invalidateBloomBuffer();
 }
 
@@ -72,12 +108,10 @@ export function render(t, dt) {
     ctx.fillRect(0, 0, W, H);
   }
 
-  // Background grid — cheap, but skipped entirely on low FX to save 40+ fillRects.
+  // Background grid — v1.24.5: prerendered offscreen once, drawn as one
+  // drawImage per frame instead of 40+ fillRect. Skipped on low FX.
   if (!fxLow()) {
-    ctx.save(); ctx.globalAlpha = 0.07;
-    ctx.fillStyle = '#0c1c3a';
-    for (let y = 0; y < H; y += 46) ctx.fillRect(0, y, W, 1);
-    ctx.restore();
+    ctx.drawImage(getGridCanvas(W, H), 0, 0);
   }
 
   // Chromatic aberration only on 'high' quality — triples render cost.
@@ -206,15 +240,13 @@ function renderScene(ctx, t, dt, shiftX, shiftY, tint) {
     ctx.fillStyle = grad;
     ctx.fillRect(x + 1, 0, lw - 2, H);
 
-    // Auto-fire beam — skip on low FX (it's cosmetic)
+    // Auto-fire beam — skip on low FX (it's cosmetic).
+    // v1.24.5: gradient cached in getBeamGrad, was recreated per lane per frame.
     if (state.beams[i] > 0.05 && !lowFx) {
       ctx.save();
       ctx.globalAlpha = 0.13 + state.beams[i] * 0.26;
       const bx = x + lw / 2;
-      const beamGrad = ctx.createLinearGradient(bx, hy, bx, 0);
-      beamGrad.addColorStop(0, '#c9ffff');
-      beamGrad.addColorStop(1, 'rgba(120,80,255,0)');
-      ctx.fillStyle = beamGrad;
+      ctx.fillStyle = getBeamGrad(ctx, bx, hy);
       ctx.fillRect(bx - lw * 0.18, 0, lw * 0.36, hy);
       ctx.restore();
     }
@@ -288,7 +320,9 @@ function renderScene(ctx, t, dt, shiftX, shiftY, tint) {
       const topY = Math.min(yHead, yTail);
       const botY = Math.max(yHead, yTail);
       ctx.save();
-      if (!lowFx) {
+      // v1.24.5: shadowBlur only on high FX. Medium gets flat colour — same
+      // shape but no expensive glow (Canvas 2D shadow is a huge fill cost).
+      if (highFx) {
         ctx.shadowColor = n.holding ? '#ff9dff' : '#5eefff';
         ctx.shadowBlur = n.holding ? 24 : 14;
       }
@@ -341,9 +375,10 @@ function renderScene(ctx, t, dt, shiftX, shiftY, tint) {
     }
     // Etap 8: note trail — 4 ghost copies at previous positions with decaying
     // alpha. Only on high FX; skipped for HOLD notes (they already have a tail).
+    // v1.24.5: 4 ghost copies were too heavy on dense charts. 2 is still visible.
     if (highFx && settings.noteTrails && !n.isHold && timeToHead < state.fallTime * 0.5) {
-      const trailLen = 4;
-      const trailStep = 0.035; // 35ms behind
+      const trailLen = 2;
+      const trailStep = 0.045; // 45ms behind
       for (let k = 1; k <= trailLen; k++) {
         const tPast = timeToHead + k * trailStep;
         if (tPast > state.fallTime) break;
@@ -363,7 +398,8 @@ function renderScene(ctx, t, dt, shiftX, shiftY, tint) {
     b.y += b.vy * dt;
     b.life -= dt;
     ctx.save();
-    if (!lowFx) {
+    // v1.24.5: bullet glow only on high FX (bullets are tiny, glow ≈ invisible on medium anyway)
+    if (highFx) {
       ctx.shadowColor = b.hold ? '#ffb5ff' : '#aefaff';
       ctx.shadowBlur  = b.hold ? 18 : 13;
     }
@@ -385,7 +421,8 @@ function renderScene(ctx, t, dt, shiftX, shiftY, tint) {
     ctx.save();
     const isBeam = state.beams[i] > 0.15;
     const laneF = flash.laneFlash[i];
-    if (!lowFx) {
+    // v1.24.5: turret ambient glow only high FX; medium keeps flash glow (rare)
+    if (highFx || laneF > 0.15) {
       ctx.shadowColor = laneF > 0.2 ? flash.laneFlashColor[i]
         : (isBeam ? '#ff9dff' : (state.flashes[i] > 0 ? '#ffffff' : '#00c8ff'));
       ctx.shadowBlur = laneF > 0.2 ? 24 + laneF * 20
