@@ -4,7 +4,7 @@
 export const LANES = 4;
 
 // Displayed in the corner and results screen so we know which build is running.
-export const APP_VERSION = '1.24.2';
+export const APP_VERSION = '1.7.2-mobile';
 
 // Judge windows (seconds) — base values, multiplied by calibration.judgeMultiplier() at runtime.
 // v1.2: 6 tiers instead of 3 for finer feedback. MISS = anything past OK.

@@ -27,7 +27,6 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          # Upload the whole repo root — index.html is at the root already
           path: '.'
       - id: deployment
         uses: actions/deploy-pages@v4

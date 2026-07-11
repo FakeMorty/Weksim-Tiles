@@ -13,6 +13,7 @@ import { bindStats } from './ui/stats.js';
 import { bindLanguagePicker } from './ui/language.js';
 import { loadLocale, applyTranslations, setLocale, getLocale, getLocaleDir } from './i18n/i18n.js';
 import { APP_VERSION } from './config.js';
+import { initWakeLockAutoReacquire, isTouchDevice, isPortrait } from './mobile/mobileFeatures.js';
 
 // i18n has to load BEFORE bindMenu — otherwise the menu would render in
 // English and then flash to the user's language on first re-translate.
@@ -32,5 +33,18 @@ bindCalibration();
 bindPause();
 bindStats();
 bindLanguagePicker();
+initWakeLockAutoReacquire();
+
+// Mobile: show portrait warning if the user is holding the phone vertically.
+function updateOrientationHint() {
+  const el = document.getElementById('rotateHint');
+  if (!el) return;
+  const shouldShow = isTouchDevice() && isPortrait();
+  el.style.display = shouldShow ? 'flex' : 'none';
+}
+window.addEventListener('resize', updateOrientationHint);
+window.addEventListener('orientationchange', updateOrientationHint);
+updateOrientationHint();
+
 idleRender();
-console.log('%cWeksim-Tiles v' + APP_VERSION + ' (' + getLocale() + ')', 'color:#7efaff;font-weight:bold');
+console.log('%cWeksim-Tiles Mobile v' + APP_VERSION + ' (' + getLocale() + ')', 'color:#7efaff;font-weight:bold');

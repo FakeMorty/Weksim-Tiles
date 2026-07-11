@@ -1,0 +1,21 @@
+{
+  "name": "Rhythm Shooter Mobile",
+  "short_name": "Rhythm Shooter",
+  "description": "Touch-first neon rhythm game with automatic beatmap generation from your music.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#05060d",
+  "theme_color": "#05060d",
+  "categories": ["games", "music"],
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%2305060d'/><circle cx='256' cy='256' r='180' fill='none' stroke='%237efaff' stroke-width='16'/><polygon points='256,140 360,320 152,320' fill='%237efaff'/></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,13 +1,13 @@
 {
-  "name": "rhythm-shooter-neon",
-  "version": "1.24.2",
-  "description": "Rhythm Shooter - neon piano tiles shooter. STFT + multiband flux, Web Worker analysis, HOLD notes, calibration.",
+  "name": "rhythm-shooter-neon-mobile",
+  "version": "1.7.2-mobile",
+  "description": "Rhythm Shooter Mobile - touch-first neon rhythm game, adapted from Weksim-Tiles.",
   "main": "main.cjs",
   "type": "module",
-  "homepage": "https://fakemorty.github.io/Weksim-Tiles/",
+  "homepage": "https://fakemorty.github.io/Weksim-Tiles-Mobile/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/FakeMorty/Weksim-Tiles.git"
+    "url": "https://github.com/FakeMorty/Weksim-Tiles-Mobile.git"
   },
   "author": "FakeMorty",
   "license": "MIT",
@@ -16,33 +16,9 @@
     "start": "electron .",
     "dev": "electron .",
     "serve": "npx serve .",
-    "test": "node scripts/smoketest.mjs && node scripts/analyzer-test.mjs",
-    "build": "electron-builder --win portable",
-    "build:win": "electron-builder --win nsis portable"
+    "test": "node scripts/smoketest.mjs"
   },
   "devDependencies": {
-    "electron": "^31.0.0",
-    "electron-builder": "^24.13.3"
-  },
-  "build": {
-    "appId": "com.rhythmshooter.neon",
-    "productName": "Rhythm Shooter",
-    "files": [
-      "index.html",
-      "main.cjs",
-      "preload.cjs",
-      "src/**/*"
-    ],
-    "win": {
-      "target": ["portable", "nsis"],
-      "icon": "icon.ico"
-    },
-    "portable": {
-      "artifactName": "RhythmShooter-${version}-win-portable.exe"
-    },
-    "directories": {
-      "output": "dist"
-    },
-    "compression": "maximum"
+    "electron": "^31.0.0"
   }
 }
