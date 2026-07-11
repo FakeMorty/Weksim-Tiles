@@ -4,6 +4,7 @@ import { recentPlays, totalStats, clearStats } from '../game/stats.js';
 import { clearCache } from '../audio/cache.js';
 import { exportMap, importMap, downloadMapFile, readMapFile } from '../audio/mapIO.js';
 import { state } from '../game/state.js';
+import { t, getLocale } from '../i18n/i18n.js';
 
 const DIFF_COLORS = {
   easy:   { bg: '#0e2b1c', fg: '#7aff99' },
@@ -28,15 +29,15 @@ export function bindStats() {
     document.getElementById('menu').style.display = 'flex';
   });
   clearHistoryBtn?.addEventListener('click', () => {
-    if (confirm('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0432\u0441\u044e \u0438\u0441\u0442\u043e\u0440\u0438\u044e \u0438\u0433\u0440?')) {
+    if (confirm(t('stats.confirmClearHistory'))) {
       clearStats();
       renderStats();
     }
   });
   clearCacheBtn?.addEventListener('click', async () => {
-    if (confirm('\u041e\u0447\u0438\u0441\u0442\u0438\u0442\u044c \u043a\u044d\u0448 \u0430\u043d\u0430\u043b\u0438\u0437\u0430 (\u0442\u0440\u0435\u043a\u0438 \u0431\u0443\u0434\u0443\u0442 \u0430\u043d\u0430\u043b\u0438\u0437\u0438\u0440\u043e\u0432\u0430\u0442\u044c\u0441\u044f \u0437\u0430\u043d\u043e\u0432\u043e)?')) {
+    if (confirm(t('stats.confirmClearCache'))) {
       await clearCache();
-      alert('\u041a\u044d\u0448 \u043e\u0447\u0438\u0449\u0435\u043d');
+      alert(t('stats.cacheCleared'));
     }
   });
 
@@ -52,14 +53,13 @@ export function bindStats() {
       const map = importMap(text);
       // Stash on state so play sequence can consume it instead of running analyzer
       state.pendingImportedMap = map;
-      alert(
-        '\u041a\u0430\u0440\u0442\u0430 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043d\u0430: ' + map.notes.length + ' \u043d\u043e\u0442, ' +
-        Math.round(map.bpm) + ' BPM\n\n' +
-        '\u0422\u0435\u043f\u0435\u0440\u044c \u0437\u0430\u0433\u0440\u0443\u0437\u0438 \u0430\u0443\u0434\u0438\u043e\u0444\u0430\u0439\u043b: "' +
-        (map._importMeta?.fileName || '?') + '" \u2014 \u0438 \u043d\u0430\u0436\u043c\u0438 \u0418\u0433\u0440\u0430\u0442\u044c'
-      );
+      alert(t('menu.importedAlert', {
+        notes: map.notes.length,
+        bpm: Math.round(map.bpm),
+        filename: map._importMeta?.fileName || '?',
+      }));
     } catch (err) {
-      alert('\u041e\u0448\u0438\u0431\u043a\u0430 \u0438\u043c\u043f\u043e\u0440\u0442\u0430: ' + err.message);
+      alert(t('menu.importError', { err: err.message }));
     }
     // Reset so same file can be re-imported
     mapFileInput.value = '';
@@ -69,7 +69,7 @@ export function bindStats() {
   const exportBtn = document.getElementById('exportMapBtn');
   exportBtn?.addEventListener('click', () => {
     if (!state.lastAnalysis) {
-      alert('\u041d\u0435\u0442 \u043a\u0430\u0440\u0442\u044b \u0434\u043b\u044f \u044d\u043a\u0441\u043f\u043e\u0440\u0442\u0430');
+      alert(t('menu.noMapToExport'));
       return;
     }
     const json = exportMap(state.lastAnalysis, {
@@ -88,24 +88,26 @@ export function bindStats() {
 }
 
 function renderStats() {
-  const t = totalStats();
-  document.getElementById('statsTotalPlays').textContent = t.plays.toLocaleString('ru-RU');
-  document.getElementById('statsNotesHit').textContent = t.notesHit.toLocaleString('ru-RU');
-  document.getElementById('statsPlaytime').textContent = (t.playtimeSec / 3600).toFixed(1);
+  const tot = totalStats();
+  // Use the current locale for number formatting; falls back to 'en' on odd codes
+  const nfLocale = getLocale() === 'ru' ? 'ru-RU' : getLocale();
+  document.getElementById('statsTotalPlays').textContent = tot.plays.toLocaleString(nfLocale);
+  document.getElementById('statsNotesHit').textContent = tot.notesHit.toLocaleString(nfLocale);
+  document.getElementById('statsPlaytime').textContent = (tot.playtimeSec / 3600).toFixed(1);
 
   const list = document.getElementById('statsList');
   const plays = recentPlays(50);
   if (!plays.length) {
-    list.innerHTML = '<div class="stats-empty">\u041f\u043e\u043a\u0430 \u043d\u0435\u0442 \u0438\u0433\u0440. \u0421\u044b\u0433\u0440\u0430\u0439 \u0447\u0442\u043e-\u043d\u0438\u0431\u0443\u0434\u044c!</div>';
+    list.innerHTML = '<div class="stats-empty">' + escapeHtml(t('stats.empty')) + '</div>';
     return;
   }
   let html = '<div class="stats-row header">' +
-    '<span>\u0422\u0440\u0435\u043a</span>' +
-    '<span>\u0421\u043b\u043e\u0436\u043d.</span>' +
-    '<span class="num">Score</span>' +
-    '<span class="num">Acc</span>' +
-    '<span class="num">Combo</span>' +
-    '<span class="num">\u0414\u0430\u0442\u0430</span>' +
+    '<span>' + escapeHtml(t('stats.colTrack'))  + '</span>' +
+    '<span>' + escapeHtml(t('stats.colDiff'))   + '</span>' +
+    '<span class="num">' + escapeHtml(t('stats.colScore')) + '</span>' +
+    '<span class="num">' + escapeHtml(t('stats.colAcc'))   + '</span>' +
+    '<span class="num">' + escapeHtml(t('stats.colCombo')) + '</span>' +
+    '<span class="num">' + escapeHtml(t('stats.colDate'))  + '</span>' +
     '</div>';
   for (const p of plays) {
     const c = DIFF_COLORS[p.difficulty] || DIFF_COLORS.normal;
@@ -115,7 +117,7 @@ function renderStats() {
     html += '<div class="stats-row">' +
       '<span class="name" title="' + escapeHtml(p.fileName) + '">' + escapeHtml(p.fileName || '?') + '</span>' +
       '<span class="diff" style="background:' + c.bg + ';color:' + c.fg + '">' + p.difficulty.toUpperCase() + '</span>' +
-      '<span class="num">' + p.score.toLocaleString('ru-RU') + '</span>' +
+      '<span class="num">' + p.score.toLocaleString(nfLocale) + '</span>' +
       '<span class="num">' + p.accuracy + '%</span>' +
       '<span class="num">' + p.maxCombo + '</span>' +
       '<span class="num">' + dateStr + '</span>' +

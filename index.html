@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
@@ -142,11 +142,11 @@
 
 <div id="hud">
   <div id="hudLeft">
-    <div class="hud-pill">SCORE <span class="hud-big" id="scoreEl" style="margin-left:8px">0</span></div>
-    <div class="hud-pill">ACC <span id="accEl">100%</span> • <span id="hitsEl">0 / 0</span></div>
+    <div class="hud-pill"><span data-i18n="hud.score">SCORE</span> <span class="hud-big" id="scoreEl" style="margin-left:8px">0</span></div>
+    <div class="hud-pill"><span data-i18n="hud.accuracy">ACC</span> <span id="accEl">100%</span> • <span id="hitsEl">0 / 0</span></div>
   </div>
   <div id="hudRight" style="text-align:right">
-    <div class="hud-pill">COMBO <span class="hud-big" id="comboEl" style="margin-left:6px">0</span></div>
+    <div class="hud-pill"><span data-i18n="hud.combo">COMBO</span> <span class="hud-big" id="comboEl" style="margin-left:6px">0</span></div>
     <div class="hud-pill"><span id="modeEl">DRUMS</span> • <span id="bpmEl">-- BPM</span> • <span id="holdCountEl">HOLD 0</span></div>
   </div>
 </div>
@@ -163,221 +163,220 @@
   <div class="subtitle" id="menuSubtitle">neon tiles • shoot the beat</div>
   <div class="panel">
     <div class="dropzone" id="dropzone">
-      <strong>Перетащи свой трек сюда</strong><br>или кликни чтобы выбрать MP3 / WAV / OGG / FLAC
+      <strong data-i18n="menu.dropzoneMain">Drop your track here</strong><br><span data-i18n="menu.dropzoneSub">or click to pick MP3 / WAV / OGG / FLAC</span>
       <input type="file" id="fileInput" accept="audio/*">
       <div id="trackName"></div>
       <div class="small-tags">
-        <div class="tag">Авто beatmap</div>
-        <div class="tag">HOLD NOTES</div>
+        <div class="tag" data-i18n="menu.tagAutoBeatmap">Auto beatmap</div>
+        <div class="tag" data-i18n="menu.tagHoldNotes">HOLD notes</div>
         <div class="tag bpm-tag" id="detectedBpmTag" style="display:none">-- BPM</div>
-        <div class="tag">D F J K / tap & hold</div>
-        <div class="tag">offline анализ</div>
+        <div class="tag" data-i18n="menu.tagTapHold">D F J K / tap & hold</div>
+        <div class="tag" data-i18n="menu.tagOfflineAnalysis">offline analysis</div>
       </div>
     </div>
 
     <div class="row">
       <div class="modes" style="flex:1">
-        <button class="mode-btn active" data-mode="drums">DRUMS<small>ударные • 50–220 Hz</small></button>
-        <button class="mode-btn" data-mode="classic">CLASSIC<small>full • holds вкл</small></button>
-        <button class="mode-btn" data-mode="vocal">VOCAL<small>вокал • long holds</small></button>
+        <button class="mode-btn active" data-mode="drums"><span data-i18n="menu.modeDrums">DRUMS</span><small data-i18n="menu.modeDrumsSub">drums • 50–220 Hz</small></button>
+        <button class="mode-btn" data-mode="classic"><span data-i18n="menu.modeClassic">CLASSIC</span><small data-i18n="menu.modeClassicSub">full spectrum • holds on</small></button>
+        <button class="mode-btn" data-mode="vocal"><span data-i18n="menu.modeVocal">VOCAL</span><small data-i18n="menu.modeVocalSub">vocals • long holds</small></button>
       </div>
     </div>
 
     <div class="sliders">
       <div class="slider-box">
-        <label>Чувствительность <span id="sensVal">1.25σ</span></label>
+        <label><span data-i18n="menu.sensitivity">Sensitivity</span> <span id="sensVal">1.25σ</span></label>
         <input type="range" id="sens" min="0.5" max="2.5" step="0.05" value="1.25">
       </div>
       <div class="slider-box">
-        <label>Скорость падения <span id="fallVal">Авто BPM</span></label>
+        <label><span data-i18n="menu.fallSpeed">Fall speed</span> <span id="fallVal" data-i18n="menu.fallSpeedAuto">Auto BPM</span></label>
         <input type="range" id="fallSpeed" min="0.85" max="2.4" step="0.05" value="1.45">
-        <small id="fallHint" style="color:#5a8dad;font-size:10px">Авто под BPM, можно отключить ниже</small>
+        <small id="fallHint" style="color:#5a8dad;font-size:10px" data-i18n="menu.fallHintAuto">Auto by BPM, can be disabled below</small>
       </div>
       <div class="slider-box">
-        <label>Длинные ноты <span id="holdVal">Авто</span></label>
+        <label><span data-i18n="menu.holdAmount">Long notes</span> <span id="holdVal" data-i18n="menu.holdAuto">Auto</span></label>
         <input type="range" id="holdAmt" min="0" max="2" step="1" value="1">
       </div>
     </div>
 
     <div class="toggle-row">
-      <label><input type="checkbox" id="bpmAuto" checked> <b>Авто BPM</b> — синхронизировать скорость</label>
-      <label>Подлёт:
+      <label><input type="checkbox" id="bpmAuto" checked> <span data-i18n="menu.bpmAuto">Auto BPM — sync speed</span></label>
+      <label><span data-i18n="menu.beatsLead">Lead:</span>
         <select id="beatsLead">
-          <option value="2.5">Slow 2.5 beats</option>
-          <option value="2.0" selected>Normal 2.0 beats</option>
-          <option value="1.6">Fast 1.6 beats</option>
+          <option value="2.5" data-i18n="menu.beatsLeadSlow">Slow 2.5 beats</option>
+          <option value="2.0" selected data-i18n="menu.beatsLeadNormal">Normal 2.0 beats</option>
+          <option value="1.6" data-i18n="menu.beatsLeadFast">Fast 1.6 beats</option>
         </select>
       </label>
-      <label><input type="checkbox" id="holdEnable" checked> HOLD-ноты</label>
-      <label><input type="checkbox" id="dualEnable" checked> Аккорды</label>
-      <label><input type="checkbox" id="autoLane" checked> Умная раскладка</label>
-      <label><input type="checkbox" id="bgReactiveCheck" checked> Пульсация фона</label>
-      <label><input type="checkbox" id="bgSpectrumCheck"> Эквалайзер снизу</label>
-      <label><input type="checkbox" id="vignetteCheck" checked> Виньетка</label>
-      <label><input type="checkbox" id="noteTrailsCheck" checked> След за нотами</label>
-      <label><input type="checkbox" id="motionBlurCheck"> Motion blur</label>
-      <label><input type="checkbox" id="bloomCheck"> Bloom (дорого)</label>
+      <label><input type="checkbox" id="holdEnable" checked> <span data-i18n="menu.holdNotesToggle">HOLD notes</span></label>
+      <label><input type="checkbox" id="dualEnable" checked> <span data-i18n="menu.chordsToggle">Chords</span></label>
+      <label><input type="checkbox" id="autoLane" checked> <span data-i18n="menu.smartLaneToggle">Smart lane layout</span></label>
+      <label><input type="checkbox" id="bgReactiveCheck" checked> <span data-i18n="menu.bgReactive">Background pulse</span></label>
+      <label><input type="checkbox" id="bgSpectrumCheck"> <span data-i18n="menu.bgSpectrum">Bottom equaliser</span></label>
+      <label><input type="checkbox" id="vignetteCheck" checked> <span data-i18n="menu.vignette">Vignette</span></label>
+      <label><input type="checkbox" id="noteTrailsCheck" checked> <span data-i18n="menu.noteTrails">Note trails</span></label>
+      <label><input type="checkbox" id="motionBlurCheck"> <span data-i18n="menu.motionBlur">Motion blur</span></label>
+      <label><input type="checkbox" id="bloomCheck"> <span data-i18n="menu.bloom">Bloom (expensive)</span></label>
     </div>
 
     <div class="sliders" style="margin-top:14px">
       <div class="slider-box">
-        <label>Сложность <span id="difficultyVal">NORMAL</span></label>
+        <label><span data-i18n="menu.difficulty">Difficulty</span> <span id="difficultyVal">NORMAL</span></label>
         <select id="difficultySelect" style="width:100%;margin-top:6px;background:#08132a;color:#bfefff;border:1px solid #1d3358;border-radius:8px;padding:6px;font-family:'JetBrains Mono',monospace;">
-          <option value="easy">EASY — ≤2.5 нот/сек, спокойно</option>
-          <option value="normal" selected>NORMAL — ≤4 нот/сек</option>
-          <option value="hard">HARD — ≤6.5 нот/сек</option>
-          <option value="expert">EXPERT — ≤10 нот/сек, безумие</option>
+          <option value="easy" data-i18n="menu.difficultyEasy">EASY — ≤2.5 n/s, relaxed</option>
+          <option value="normal" selected data-i18n="menu.difficultyNormal">NORMAL — ≤4 n/s</option>
+          <option value="hard" data-i18n="menu.difficultyHard">HARD — ≤6.5 n/s</option>
+          <option value="expert" data-i18n="menu.difficultyExpert">EXPERT — ≤10 n/s, insane</option>
         </select>
       </div>
       <div class="slider-box">
-        <label>Громкость <span id="menuVolumeVal">55%</span></label>
+        <label><span data-i18n="menu.volume">Volume</span> <span id="menuVolumeVal">55%</span></label>
         <input type="range" id="menuVolume" min="0" max="100" step="1" value="55">
       </div>
       <div class="slider-box">
-        <label>Качество эффектов</label>
+        <label data-i18n="menu.fxQuality">FX quality</label>
         <select id="fxQualitySelect">
-          <option value="high">Высокое (bloom, aberration, все частицы)</option>
-          <option value="medium">Среднее (без aberration)</option>
-          <option value="low">Низкое (для слабых ПК)</option>
+          <option value="high" data-i18n="menu.fxHigh">High (bloom, aberration, all particles)</option>
+          <option value="medium" data-i18n="menu.fxMedium">Medium (no aberration)</option>
+          <option value="low" data-i18n="menu.fxLow">Low (for weak PCs)</option>
         </select>
       </div>
       <div class="slider-box">
-        <label>HPSS (разделение сигнала)</label>
+        <label data-i18n="menu.hpss">HPSS (signal separation)</label>
         <select id="hpssModeSelect">
-          <option value="off">Выкл (быстро, для чистых треков)</option>
-          <option value="hard" selected>Hard (стандарт, лучше для ударных)</option>
-          <option value="soft">Soft (плавно, лучше для смешанных)</option>
-          <option value="iterative">Iterative (макс качество, ×2 медленнее)</option>
+          <option value="off" data-i18n="menu.hpssOff">Off (fast, for clean tracks)</option>
+          <option value="hard" selected data-i18n="menu.hpssHard">Hard (standard, best for drums)</option>
+          <option value="soft" data-i18n="menu.hpssSoft">Soft (smooth, best for mixed)</option>
+          <option value="iterative" data-i18n="menu.hpssIterative">Iterative (max quality, ×2 slower)</option>
         </select>
+      </div>
+      <div class="slider-box">
+        <label data-i18n="meta.langLabel">Language</label>
+        <select id="languageSelect"></select>
       </div>
     </div>
 
-    <button class="play-btn" id="playBtn" disabled>Сначала загрузи трек</button>
+    <button class="play-btn" id="playBtn" disabled data-i18n="menu.playButtonPickTrack">Load a track first</button>
     <div style="text-align:center;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-      <button id="openCalibrationBtn">⚙ Калибровка задержки</button>
-      <button id="openStatsBtn">📊 Статистика</button>
-      <button id="importMapBtn">📥 Импорт карты</button>
+      <button id="openCalibrationBtn" data-i18n="menu.calibrationBtn">⚙ Latency calibration</button>
+      <button id="openStatsBtn" data-i18n="menu.statsBtn">📊 Statistics</button>
+      <button id="importMapBtn" data-i18n="menu.importMapBtn">📥 Import map</button>
       <input type="file" id="mapFileInput" accept=".json" style="display:none">
     </div>
     <div class="hint">
-      <b>v1.1 BPM AUTO:</b> теперь игра детектит BPM трека и подстраивает скорость падения.<br>
-      Медленный трек 82 BPM → ~1.47s полёт, быстрый 168 BPM → ~0.95s. Можно отключить “Авто BPM” и ставить руками.<br>
-      Управление: <span class="keycaps"><span>D</span><span>F</span><span>J</span><span>K</span></span> tap / hold • ESC выход.
+      <span data-i18n="menu.hint">BPM AUTO: game detects BPM and syncs falling speed.</span><br>
+      <span data-i18n="menu.controlsHint">Controls: D F J K tap / hold • ESC to exit.</span>
     </div>
   </div>
-  <div class="ghost">v1.1 bpm • Auto tempo sync • WebAudio Offline • 2026-07-10</div>
 </div>
 
 <div id="result">
   <div class="panel result-card">
-    <div class="subtitle">MISSION COMPLETE</div>
+    <div class="subtitle" data-i18n="results.missionComplete">MISSION COMPLETE</div>
     <div class="result-score" id="finalScore">0</div>
     <div class="result-grid">
-      <div class="result-item">Точность<b id="finalAcc">0%</b></div>
-      <div class="result-item">Макс комбо<b id="finalCombo">0</b></div>
-      <div class="result-item">BPM<b id="finalBpm">--</b></div>
-      <div class="result-item">PERFECT<b id="finalPerfect">0</b></div>
-      <div class="result-item">GOOD<b id="finalGood">0</b></div>
-      <div class="result-item">HOLDS<b id="finalHolds">0/0</b></div>
-      <div class="result-item">MISS<b id="finalMiss">0</b></div>
-      <div class="result-item">Скорость<b id="finalSpeed">--</b></div>
-      <div class="result-item">Score<b id="finalScore2">0</b></div>
-      <div class="result-item">FPS avg/1%/min<b id="finalFps">--</b></div>
-      <div class="result-item">Прошлый рекорд<b id="finalBest">—</b></div>
+      <div class="result-item"><span data-i18n="results.accuracy">Accuracy</span><b id="finalAcc">0%</b></div>
+      <div class="result-item"><span data-i18n="results.maxCombo">Max combo</span><b id="finalCombo">0</b></div>
+      <div class="result-item"><span data-i18n="results.bpm">BPM</span><b id="finalBpm">--</b></div>
+      <div class="result-item"><span data-i18n="results.perfect">PERFECT</span><b id="finalPerfect">0</b></div>
+      <div class="result-item"><span data-i18n="results.good">GOOD</span><b id="finalGood">0</b></div>
+      <div class="result-item"><span data-i18n="results.holds">HOLDS</span><b id="finalHolds">0/0</b></div>
+      <div class="result-item"><span data-i18n="results.miss">MISS</span><b id="finalMiss">0</b></div>
+      <div class="result-item"><span data-i18n="results.speed">Speed</span><b id="finalSpeed">--</b></div>
+      <div class="result-item"><span data-i18n="results.score">Score</span><b id="finalScore2">0</b></div>
+      <div class="result-item"><span data-i18n="results.fps">FPS avg/1%/min</span><b id="finalFps">--</b></div>
+      <div class="result-item"><span data-i18n="results.prevBest">Previous best</span><b id="finalBest">—</b></div>
     </div>
     <div style="margin-top:14px">
-      <div style="font-size:10px;color:#5a89a6;letter-spacing:.14em;text-transform:uppercase;text-align:center;margin-bottom:6px">Гистограмма попаданий</div>
+      <div style="font-size:10px;color:#5a89a6;letter-spacing:.14em;text-transform:uppercase;text-align:center;margin-bottom:6px" data-i18n="results.hitChart">HIT HISTOGRAM</div>
       <canvas id="hitChart" width="580" height="120" style="width:100%;max-width:580px;height:120px;background:#050b1a;border:1px solid #1a2f52;border-radius:10px;"></canvas>
     </div>
     <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
-      <button class="play-btn" id="againBtn" style="flex:2">Сыграть снова</button>
-      <button class="pause-btn" id="exportMapBtn" style="flex:1;margin:0">📤 Экспорт карты</button>
+      <button class="play-btn" id="againBtn" style="flex:2" data-i18n="results.playAgain">Play again</button>
+      <button class="pause-btn" id="exportMapBtn" style="flex:1;margin:0" data-i18n="results.exportMap">📤 Export map</button>
     </div>
-    <div class="ghost" style="margin-top:12px">BPM автосинхронизация включена. Меняй “Подлёт” Slow/Normal/Fast для комфорта.</div>
+    <div class="ghost" style="margin-top:12px" data-i18n="results.footer">Auto BPM sync on. Change "Lead" Slow/Normal/Fast for comfort.</div>
   </div>
 </div>
 
 <div id="calibrationScreen">
   <div class="cal-panel">
-    <div class="cal-title">КАЛИБРОВКА ЗАДЕРЖКИ</div>
-    <div class="cal-desc">
-      Твоё железо (Bluetooth-наушники, USB-DAC, монитор) вносит задержку между тем, как ты слышишь бит, и тем, как игра его засчитывает.
-      Тапай <b>Space</b> или кликай по кругу в такт бипам — игра посчитает медианный оффсет и разброс.
-    </div>
+    <div class="cal-title" data-i18n="cal.title">LATENCY CALIBRATION</div>
+    <div class="cal-desc" data-i18n="cal.desc">Your hardware adds latency between beat and detection. Tap Space or click the ring on every beep.</div>
     <div id="calMetroBox">
       <div id="calMetroRing"></div>
       <div id="calTapPulse"></div>
       <div id="calTapZone"></div>
-      <div class="cal-tap-label">SPACE / CLICK</div>
+      <div class="cal-tap-label" data-i18n="cal.tapZoneLabel">SPACE / CLICK</div>
     </div>
-    <div id="calStatus">Нажми «Старт» и тапай на каждый высокий бип</div>
+    <div id="calStatus" data-i18n="cal.statusStart">Press Start and tap on every high beep</div>
     <div id="calResult"></div>
     <div id="calSuggestedOffset"></div>
     <div class="cal-row">
-      <button class="cal-btn primary" id="calibrationStartBtn">▶ Старт (12 тапов)</button>
-      <button class="cal-btn" id="calibrationApplyBtn" disabled>Применить</button>
-      <button class="cal-btn" id="calibrationResetBtn">Сброс</button>
+      <button class="cal-btn primary" id="calibrationStartBtn" data-i18n="cal.startButton">▶ Start (12 taps)</button>
+      <button class="cal-btn" id="calibrationApplyBtn" disabled data-i18n="cal.applyButton">Apply</button>
+      <button class="cal-btn" id="calibrationResetBtn" data-i18n="cal.resetButton">Reset</button>
     </div>
 
     <div class="cal-manual">
-      <div class="cal-manual-title">Ручная настройка</div>
+      <div class="cal-manual-title" data-i18n="cal.manualTitle">Manual tuning</div>
       <div class="cal-slider-row">
-        <label>Audio offset</label>
+        <label data-i18n="cal.audioOffset">Audio offset</label>
         <input type="range" id="audioOffsetSlider" min="-300" max="300" step="1" value="0">
         <span class="val" id="audioOffsetVal">0 ms</span>
       </div>
       <div class="cal-slider-row">
-        <label>Visual offset</label>
+        <label data-i18n="cal.visualOffset">Visual offset</label>
         <input type="range" id="visualOffsetSlider" min="-200" max="200" step="1" value="0">
         <span class="val" id="visualOffsetVal">0 ms</span>
       </div>
       <div class="cal-slider-row">
-        <label>Строгость</label>
+        <label data-i18n="cal.strictness">Strictness</label>
         <select id="judgeModeSelect">
-          <option value="lenient">Мягкие окна (для новичков)</option>
-          <option value="normal" selected>Нормальные окна</option>
-          <option value="strict">Строгие окна</option>
-          <option value="insane">Безумные окна (осу-стайл)</option>
+          <option value="lenient" data-i18n="cal.strictnessLenient">Lenient windows (for beginners)</option>
+          <option value="normal" selected data-i18n="cal.strictnessNormal">Normal windows</option>
+          <option value="strict" data-i18n="cal.strictnessStrict">Strict windows</option>
+          <option value="insane" data-i18n="cal.strictnessInsane">Insane windows (osu-style)</option>
         </select>
       </div>
     </div>
 
     <div class="cal-row" style="margin-top:14px">
-      <button class="cal-btn" id="calibrationCloseBtn">← Назад в меню</button>
+      <button class="cal-btn" id="calibrationCloseBtn" data-i18n="cal.back">← Back to menu</button>
     </div>
   </div>
 </div>
 
 <div id="statsScreen">
   <div class="stats-panel">
-    <h2>СТАТИСТИКА</h2>
+    <h2 data-i18n="stats.title">STATISTICS</h2>
     <div class="stats-summary">
-      <div class="cell"><span>Игр всего</span><b id="statsTotalPlays">0</b></div>
-      <div class="cell"><span>Нот сыграно</span><b id="statsNotesHit">0</b></div>
-      <div class="cell"><span>Часов музыки</span><b id="statsPlaytime">0</b></div>
+      <div class="cell"><span data-i18n="stats.totalPlays">Games total</span><b id="statsTotalPlays">0</b></div>
+      <div class="cell"><span data-i18n="stats.notesHit">Notes played</span><b id="statsNotesHit">0</b></div>
+      <div class="cell"><span data-i18n="stats.playtime">Hours of music</span><b id="statsPlaytime">0</b></div>
     </div>
     <div class="stats-list" id="statsList"></div>
     <div class="cal-row" style="margin-top:16px">
-      <button class="cal-btn" id="statsCloseBtn">← Назад</button>
-      <button class="cal-btn danger" id="statsClearBtn">🗑 Очистить историю</button>
-      <button class="cal-btn danger" id="cacheClearBtn">🗑 Очистить кэш анализа</button>
+      <button class="cal-btn" id="statsCloseBtn" data-i18n="stats.back">← Back</button>
+      <button class="cal-btn danger" id="statsClearBtn" data-i18n="stats.clearHistory">🗑 Clear history</button>
+      <button class="cal-btn danger" id="cacheClearBtn" data-i18n="stats.clearCache">🗑 Clear analysis cache</button>
     </div>
   </div>
 </div>
 
 <div id="pauseScreen">
   <div class="pause-panel">
-    <div class="pause-title">ПАУЗА</div>
-    <div class="pause-sub">ESC — продолжить</div>
+    <div class="pause-title" data-i18n="pause.title">PAUSE</div>
+    <div class="pause-sub" data-i18n="pause.escHint">ESC to resume</div>
     <div class="pause-vol">
-      <label>🔊 Громк.</label>
+      <label data-i18n="pause.volumeLabel">🔊 Volume</label>
       <input type="range" id="pauseVolume" min="0" max="100" step="1" value="55">
       <span class="val" id="pauseVolumeVal">55%</span>
     </div>
-    <button class="pause-btn primary" id="pauseContinueBtn">▶ Продолжить</button>
-    <button class="pause-btn" id="pauseRestartBtn">↻ Переиграть песню</button>
-    <button class="pause-btn danger" id="pauseExitBtn">✕ Выйти в меню</button>
-    <div class="pause-hint">ESC — быстрая пауза / продолжить</div>
+    <button class="pause-btn primary" id="pauseContinueBtn" data-i18n="pause.continue">▶ Continue</button>
+    <button class="pause-btn" id="pauseRestartBtn" data-i18n="pause.restart">↻ Restart song</button>
+    <button class="pause-btn danger" id="pauseExitBtn" data-i18n="pause.exit">✕ Exit to menu</button>
+    <div class="pause-hint" data-i18n="pause.hint">ESC — quick pause / resume</div>
   </div>
 </div>
 

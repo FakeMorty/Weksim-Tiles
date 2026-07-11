@@ -20,10 +20,12 @@ export function showHoldToast() {
   holdToastTimer = setTimeout(() => el.style.opacity = '0', 320);
 }
 
+import { t } from '../i18n/i18n.js';
+
 export function showCombo(c) {
   const el = document.getElementById('comboText');
   if (c < 3) { el.style.opacity = '0'; return; }
-  el.textContent = c + 'x COMBO';
+  el.textContent = t('judge.combo', { n: c });
   el.style.opacity = '1';
   clearTimeout(el._t);
   el._t = setTimeout(() => el.style.opacity = '0', 460);

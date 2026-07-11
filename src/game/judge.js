@@ -10,6 +10,16 @@ import { showJudge, showCombo, showHoldToast } from '../fx/toasts.js';
 import { updateHUD } from '../ui/hud.js';
 import { shake, zoomPulse, tiltPulse } from '../render/camera.js';
 import { flashLane, flashHitLine, flashScreen, bumpAberration } from '../fx/flash.js';
+import { t } from '../i18n/i18n.js';
+
+// Map internal tier codes to translation keys.
+const TIER_KEY = {
+  MARVELOUS: 'judge.marvelous',
+  PERFECT:   'judge.perfect',
+  GREAT:     'judge.great',
+  GOOD:      'judge.good',
+  OK:        'judge.ok',
+};
 
 let laneKeysEls = null;
 let holdBars = null;
@@ -68,9 +78,9 @@ function classifyTap(absDiff, mult) {
 }
 
 function classifyHoldStart(absDiff, mult) {
-  if (absDiff <= JUDGE.HOLD_MARVELOUS * mult) return { tier: 'HOLD!',  add: SCORE.HOLD_START_MARVELOUS, color: JUDGE_COLORS.HOLD_PERF,  perfect: true };
-  if (absDiff <= JUDGE.HOLD_PERFECT   * mult) return { tier: 'HOLD!',  add: SCORE.HOLD_START_PERFECT,   color: JUDGE_COLORS.HOLD_PERF,  perfect: true };
-  if (absDiff <= JUDGE.HOLD_START     * mult) return { tier: 'HOLD',   add: SCORE.HOLD_START_GOOD,      color: JUDGE_COLORS.HOLD_START, perfect: false };
+  if (absDiff <= JUDGE.HOLD_MARVELOUS * mult) return { tier: t('judge.holdBang'), add: SCORE.HOLD_START_MARVELOUS, color: JUDGE_COLORS.HOLD_PERF,  perfect: true };
+  if (absDiff <= JUDGE.HOLD_PERFECT   * mult) return { tier: t('judge.holdBang'), add: SCORE.HOLD_START_PERFECT,   color: JUDGE_COLORS.HOLD_PERF,  perfect: true };
+  if (absDiff <= JUDGE.HOLD_START     * mult) return { tier: t('judge.hold'),     add: SCORE.HOLD_START_GOOD,      color: JUDGE_COLORS.HOLD_START, perfect: false };
   return null;
 }
 
@@ -109,6 +119,8 @@ export function pressDown(lane) {
     spawnHitParticles(lane, true, holdResult.perfect ? 'PERFECT' : 'GOOD');
     // Game feel: subtle shake + lane flash on hold start
     shake(holdResult.perfect ? 3 : 1.5, 0.18);
+    // Note: the tier label passed to showJudge was already localised in
+    // classifyHoldStart, so nothing to translate here.
     flashLane(lane, holdResult.color, 1);
     flashHitLine(holdResult.color, 0.6);
     if (holdResult.perfect) zoomPulse(1.018);
@@ -132,7 +144,8 @@ export function pressDown(lane) {
     state.combo++; if (state.combo > state.maxCombo) state.maxCombo = state.combo;
     state.score += tapResult.add + Math.min(SCORE.COMBO_BONUS_MAX_TAP, state.combo * 7);
     hitOffsets.push(tapSigned * 1000);
-    showJudge(tapResult.tier, tapResult.color);
+    const tierLabel = TIER_KEY[tapResult.tier] ? t(TIER_KEY[tapResult.tier]) : tapResult.tier;
+    showJudge(tierLabel, tapResult.color);
     showCombo(state.combo);
     spawnHitParticles(lane, false, tapResult.tier);
     // Game feel per tier
@@ -189,14 +202,14 @@ export function finishHold(lane, success) {
     const bonus = SCORE.HOLD_COMPLETE_BASE + Math.floor((n.endTime - n.time) * SCORE.HOLD_COMPLETE_PER_SEC);
     state.score += bonus;
     state.combo++; if (state.combo > state.maxCombo) state.maxCombo = state.combo;
-    showJudge('HOLD OK', JUDGE_COLORS.HOLD_OK);
+    showJudge(t('judge.holdOk'), JUDGE_COLORS.HOLD_OK);
     spawnHitParticles(lane, true, 'PERFECT');
     shake(2.5, 0.22);
     flashHitLine(JUDGE_COLORS.HOLD_OK, 0.65);
     flashLane(lane, JUDGE_COLORS.HOLD_OK, 1);
   } else {
     state.combo = 0; state.misses++;
-    showJudge('BREAK', JUDGE_COLORS.BREAK);
+    showJudge(t('judge.break'), JUDGE_COLORS.BREAK);
     spawnMissParticles(lane);
     shake(5, 0.35);
     flashScreen(JUDGE_COLORS.BREAK, 0.15);

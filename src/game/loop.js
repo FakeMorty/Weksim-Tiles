@@ -15,6 +15,7 @@ import { resetFlashes, flashScreen } from '../fx/flash.js';
 import { settings } from './settings.js';
 import { resetPerf, summarisePerf } from '../utils/perf.js';
 import { attachAnalyser, detachAnalyser } from '../fx/musicReactive.js';
+import { t, getLocale } from '../i18n/i18n.js';
 
 let lastFrame = performance.now();
 
@@ -43,10 +44,11 @@ export function startPlay() {
   document.getElementById('pauseScreen').style.display = 'none';
   document.getElementById('hud').style.display = 'flex';
   document.getElementById('bottomBar').style.display = 'flex';
-  document.getElementById('modeEl').textContent = state.mode.toUpperCase();
-  document.getElementById('bpmEl').textContent = state.currentBpm ? Math.round(state.currentBpm) + ' BPM' : '--';
+  const modeKey = 'menu.mode' + state.mode.charAt(0).toUpperCase() + state.mode.slice(1);
+  document.getElementById('modeEl').textContent = t(modeKey);
+  document.getElementById('bpmEl').textContent = state.currentBpm ? t('hud.bpmValue', { bpm: Math.round(state.currentBpm) }) : '--';
   const bpmBadge = document.getElementById('bpmBadge');
-  bpmBadge.textContent = (state.currentBpm ? Math.round(state.currentBpm) + ' BPM \u2022 ' : '') + state.fallTime.toFixed(2) + 's';
+  bpmBadge.textContent = (state.currentBpm ? t('hud.bpmValue', { bpm: Math.round(state.currentBpm) }) + ' \u2022 ' : '') + state.fallTime.toFixed(2) + 's';
   bpmBadge.style.display = 'block';
   updateHUD();
 
@@ -162,8 +164,9 @@ export function endGame() {
   document.getElementById('pauseScreen').style.display = 'none';
   const totalJudged = state.perfects + state.goods + state.misses;
   const acc = totalJudged ? Math.round((state.perfects * 1 + state.goods * 0.58) / totalJudged * 100) : 100;
-  document.getElementById('finalScore').textContent = state.score.toLocaleString('ru-RU');
-  document.getElementById('finalScore2').textContent = state.score.toLocaleString('ru-RU');
+  const nfLocale = getLocale() === 'ru' ? 'ru-RU' : getLocale();
+  document.getElementById('finalScore').textContent = state.score.toLocaleString(nfLocale);
+  document.getElementById('finalScore2').textContent = state.score.toLocaleString(nfLocale);
   document.getElementById('finalAcc').textContent = acc + '%';
   document.getElementById('finalCombo').textContent = state.maxCombo;
   document.getElementById('finalPerfect').textContent = state.perfects;
@@ -212,8 +215,8 @@ export function endGame() {
     if (best && best.date !== Date.now()) {
       const isNew = state.score >= best.score;
       bestEl.innerHTML = isNew
-        ? '<span style="color:#fff4a3">NEW BEST!</span>'
-        : best.score.toLocaleString('ru-RU') + ' <small style="color:#5a89a6">(' + best.accuracy + '%)</small>';
+        ? '<span style="color:#fff4a3">' + t('results.newBest') + '</span>'
+        : best.score.toLocaleString(nfLocale) + ' <small style="color:#5a89a6">(' + best.accuracy + '%)</small>';
     } else {
       bestEl.textContent = '\u2014';
     }
@@ -275,7 +278,7 @@ function loop(now) {
     if (!n.isHold) {
       if (tJudge - n.time > missWindow) {
         n.judged = true; state.combo = 0; state.misses++;
-        showJudge('MISS', JUDGE_COLORS.MISS);
+        showJudge(t('judge.miss'), JUDGE_COLORS.MISS);
         spawnMissParticles(n.lane);
         shake(2.5, 0.2);
         flashScreen(JUDGE_COLORS.MISS, 0.10);
@@ -284,7 +287,7 @@ function loop(now) {
     } else {
       if (!n.holding && tJudge - n.time > missWindow) {
         n.judged = true; state.combo = 0; state.misses++;
-        showJudge('MISS', JUDGE_COLORS.MISS);
+        showJudge(t('judge.miss'), JUDGE_COLORS.MISS);
         spawnMissParticles(n.lane);
         shake(2.5, 0.2);
         flashScreen(JUDGE_COLORS.MISS, 0.10);

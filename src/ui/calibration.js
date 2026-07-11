@@ -3,6 +3,7 @@
 
 import { calibration, saveCalibration, resetCalibration, suggestAudioOffsetMs } from '../game/calibration.js';
 import { state } from '../game/state.js';
+import { t } from '../i18n/i18n.js';
 
 const METRONOME_BPM = 120;
 const BEAT_INTERVAL = 60 / METRONOME_BPM; // 0.5s
@@ -30,12 +31,12 @@ export function bindCalibration() {
   const judgeSelect = document.getElementById('judgeModeSelect');
   audioSlider?.addEventListener('input', e => {
     calibration.audioOffset = parseInt(e.target.value, 10);
-    document.getElementById('audioOffsetVal').textContent = calibration.audioOffset + ' ms';
+    document.getElementById('audioOffsetVal').textContent = calibration.audioOffset + ' ' + t('common.ms');
     saveCalibration();
   });
   visualSlider?.addEventListener('input', e => {
     calibration.visualOffset = parseInt(e.target.value, 10);
-    document.getElementById('visualOffsetVal').textContent = calibration.visualOffset + ' ms';
+    document.getElementById('visualOffsetVal').textContent = calibration.visualOffset + ' ' + t('common.ms');
     saveCalibration();
   });
   judgeSelect?.addEventListener('change', e => {
@@ -64,11 +65,11 @@ export function refreshCalibrationUI() {
   const judgeSelect = document.getElementById('judgeModeSelect');
   if (audioSlider) {
     audioSlider.value = calibration.audioOffset;
-    document.getElementById('audioOffsetVal').textContent = calibration.audioOffset + ' ms';
+    document.getElementById('audioOffsetVal').textContent = calibration.audioOffset + ' ' + t('common.ms');
   }
   if (visualSlider) {
     visualSlider.value = calibration.visualOffset;
-    document.getElementById('visualOffsetVal').textContent = calibration.visualOffset + ' ms';
+    document.getElementById('visualOffsetVal').textContent = calibration.visualOffset + ' ' + t('common.ms');
   }
   if (judgeSelect) judgeSelect.value = calibration.judgeMode;
 }
@@ -81,8 +82,8 @@ function openCalibration() {
   if (hint && state.audioCtx) {
     const suggested = suggestAudioOffsetMs(state.audioCtx);
     hint.textContent = suggested
-      ? 'HW hint: ~' + suggested + ' ms (Web Audio outputLatency)'
-      : 'HW hint: недоступен';
+      ? t('cal.hwHint', { ms: suggested })
+      : t('cal.hwHintNone');
   }
 }
 
@@ -103,7 +104,7 @@ function startCalibrationRun() {
   calRunning = true;
   calStartTime = calCtx.currentTime + 0.5;
 
-  document.getElementById('calStatus').textContent = 'Тапай Space / клик на каждый бип. Осталось: ' + TAPS_TARGET;
+  document.getElementById('calStatus').textContent = t('cal.statusInProgress', { n: TAPS_TARGET });
   document.getElementById('calResult').textContent = '';
   document.getElementById('calibrationStartBtn').disabled = true;
   document.getElementById('calibrationApplyBtn').disabled = true;
@@ -158,8 +159,8 @@ function recordCalTap() {
   calTapOffsets.push(offsetMs);
   const remaining = TAPS_TARGET - calTapOffsets.length;
   document.getElementById('calStatus').textContent = remaining > 0
-    ? 'Осталось: ' + remaining
-    : 'Готово! Обрабатываю…';
+    ? t('cal.statusInProgress', { n: remaining })
+    : t('cal.statusDone');
   pulseTap();
   if (calTapOffsets.length >= TAPS_TARGET) {
     setTimeout(finishCalibrationRun, 100);
@@ -169,7 +170,7 @@ function recordCalTap() {
 function finishCalibrationRun() {
   stopCalibrationRun();
   if (calTapOffsets.length < 4) {
-    document.getElementById('calStatus').textContent = 'Слишком мало тапов. Попробуй ещё раз.';
+    document.getElementById('calStatus').textContent = t('cal.statusTooFew');
     return;
   }
   const sorted = [...calTapOffsets].sort((a, b) => a - b);
@@ -183,10 +184,15 @@ function finishCalibrationRun() {
   // late → add positive audioOffset so game treats late taps as on-time.
   const suggested = Math.round(median);
 
-  document.getElementById('calStatus').textContent = 'Готово! Тапов: ' + calTapOffsets.length;
-  document.getElementById('calResult').innerHTML =
-    'Медианный оффсет: <b>' + suggested + ' ms</b> · разброс σ = ' + std.toFixed(1) + ' ms<br>' +
-    (std < 25 ? '✓ Стабильные тапы' : std < 55 ? '~ Средняя стабильность' : '⚠ Разброс большой — попробуй снова');
+  document.getElementById('calStatus').textContent = t('cal.statusTapCount', { n: calTapOffsets.length });
+  const quality = std < 25 ? t('cal.qualityStable')
+                : std < 55 ? t('cal.qualityAverage')
+                : t('cal.qualityUnstable');
+  document.getElementById('calResult').innerHTML = t('cal.result', {
+    median: suggested,
+    std: std.toFixed(1),
+    quality,
+  });
 
   document.getElementById('calibrationApplyBtn').disabled = false;
   document.getElementById('calibrationApplyBtn').dataset.suggested = suggested;
@@ -197,7 +203,7 @@ function applyCalibrationResult() {
   calibration.audioOffset = suggested;
   saveCalibration();
   refreshCalibrationUI();
-  document.getElementById('calResult').innerHTML += '<br><span style="color:#7dfffa">✓ Применено: audioOffset = ' + suggested + ' ms</span>';
+  document.getElementById('calResult').innerHTML += '<br><span style="color:#7dfffa">' + t('cal.applied', { ms: suggested }) + '</span>';
 }
 
 // --- Visual pulse (metronome ring) ---
