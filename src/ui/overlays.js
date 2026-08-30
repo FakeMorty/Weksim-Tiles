@@ -11,6 +11,13 @@ export function bindOverlayEsc() {
       return;
     }
 
+    const result = document.getElementById('result');
+    if (result && result.style.display === 'flex') {
+      document.getElementById('resultMenuBtn')?.click();
+      e.preventDefault();
+      return;
+    }
+
     if (document.querySelector('.keybind-btn.listening')) return;
 
     const settings = document.getElementById('settingsScreen');

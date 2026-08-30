@@ -20,7 +20,7 @@ import { scheduleCountIn } from './warmup.js';
 import { bindHitSoundOutput, stopAllHoldSounds } from './hitsound.js';
 import { startReplayRecording, stopReplayRecording } from './replay.js';
 import { startBot, stopBot } from './bot.js';
-import { applyHealth } from './health.js';
+import { applyHealth, setFailHandler } from './health.js';
 import { computeAccuracy, hitCount, judgedCount } from './accuracy.js';
 
 let lastFrame = performance.now();
@@ -371,6 +371,7 @@ function loop(now) {
       }
     }
     if (i === newCursor) newCursor++;
+    if (state.failed) break;
   }
   state._missCursor = newCursor;
 
@@ -390,3 +391,10 @@ export function idleRender() {
   if (!state.gameRunning) render(0, 0.016);
   requestAnimationFrame(idleRender);
 }
+
+setFailHandler(() => {
+  // Defer so the tap/miss that drained HP still records combo/HUD first.
+  queueMicrotask(() => {
+    if (state.gameRunning && state.failed) endGame();
+  });
+});

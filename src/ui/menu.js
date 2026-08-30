@@ -86,12 +86,25 @@ export function bindMenu() {
   });
   document.getElementById('demoBtn')?.addEventListener('click', loadDemoAndPlay);
   document.getElementById('againBtn').addEventListener('click', async () => {
-    // Fully unwind current playback state before returning to menu.
-    // Without this, an old sourceNode could still be playing and the
-    // results screen might reappear after the user changes mode.
+    if (!state.audioBuffer || !state.notes.length) return;
+    const { restartCurrent } = await import('../game/loop.js');
+    await restartCurrent();
+  });
+  document.getElementById('resultMenuBtn')?.addEventListener('click', async () => {
     const { exitToMenu } = await import('../game/loop.js');
     await exitToMenu();
     updatePlayButton();
+  });
+  window.addEventListener('keydown', e => {
+    const result = document.getElementById('result');
+    if (!result || result.style.display !== 'flex') return;
+    if (e.repeat) return;
+    if (e.code === 'KeyR' || e.code === 'Enter' || e.code === 'Space') {
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      document.getElementById('againBtn')?.click();
+    }
   });
 }
 
@@ -339,6 +352,7 @@ async function startGameSequence() {
     if (overlayBar) overlayBar.style.width = '100%';
     if (overlayPct) overlayPct.textContent = '100%';
     if (overlayStage) overlayStage.textContent = t('menu.analysisReady');
+    const delay = analysis.fromCache ? 60 : 280;
     setTimeout(() => {
       topNote.style.display = 'none';
       if (overlay) overlay.classList.remove('active');
@@ -346,7 +360,7 @@ async function startGameSequence() {
       updatePlayButton();
       applyKeyLabels();
       showPreview({ bot: state.botMode });
-    }, 420);
+    }, delay);
   } catch (e) {
     console.error(e);
     alert(t('common.error') + ': ' + e);

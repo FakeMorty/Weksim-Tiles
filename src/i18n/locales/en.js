@@ -123,6 +123,7 @@ export const en = {
     previewNotes: '{n} notes',
     previewHolds: '{n} holds',
     previewDensity: '{n}/s',
+    previewHint: 'Space / Enter — play · Esc — back',
   },
   hud: {
     score: 'SCORE',
@@ -178,6 +179,7 @@ export const en = {
     prevBest: 'Previous best',
     newBest: 'NEW BEST!',
     playAgain: 'Play again',
+    backToMenu: '← Menu',
     exportMap: '📤 Export map',
     hitChart: 'HIT HISTOGRAM',
     footer: 'Auto BPM sync on. Change "Lead" Slow/Normal/Fast for comfort.',

@@ -22,6 +22,27 @@ export function bindPreview() {
     hidePreview();
     document.getElementById('menu').style.display = 'flex';
   });
+  document.getElementById('previewCanvas')?.addEventListener('click', () => {
+    if (!document.getElementById('previewOverlay')?.classList.contains('active')) return;
+    document.getElementById('previewPlayBtn')?.click();
+  });
+  window.addEventListener('keydown', e => {
+    if (!document.getElementById('previewOverlay')?.classList.contains('active')) return;
+    if (e.repeat) return;
+    if (e.code === 'Space' || e.code === 'Enter') {
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      document.getElementById('previewPlayBtn')?.click();
+    }
+  });
+  window.addEventListener('resize', () => {
+    if (!document.getElementById('previewOverlay')?.classList.contains('active')) return;
+    const canvas = document.getElementById('previewCanvas');
+    if (canvas) {
+      drawPreview(canvas, state.notes, state.audioBuffer?.duration || 1, state.currentBpm);
+    }
+  });
 }
 
 export function showPreview({ bot = false } = {}) {
@@ -60,14 +81,13 @@ export function hidePreview() {
 }
 
 function drawPreview(canvas, notes, duration, bpm) {
-  const wrap = canvas.parentElement;
-  const cssW = Math.max(320, (wrap?.clientWidth || canvas.clientWidth || 640));
-  const cssH = 160;
+  canvas.style.width = 'min(640px, 90vw)';
+  canvas.style.height = '176px';
+  const cssW = Math.max(280, canvas.clientWidth || 640);
+  const cssH = 176;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   canvas.width = Math.floor(cssW * dpr);
   canvas.height = Math.floor(cssH * dpr);
-  canvas.style.width = cssW + 'px';
-  canvas.style.height = cssH + 'px';
   const ctx = canvas.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const W = cssW, H = cssH;
@@ -75,16 +95,20 @@ function drawPreview(canvas, notes, duration, bpm) {
   ctx.fillRect(0, 0, W, H);
 
   const dur = Math.max(duration || 1, 1);
-  const laneH = H / 4;
+  const axisH = 16;
+  const playH = H - axisH;
+  const laneH = playH / 4;
+
+  drawWaveform(ctx, state.audioBuffer, W, playH);
 
   if (bpm > 40) {
     const bar = 60 / bpm * 4;
-    ctx.strokeStyle = 'rgba(126,250,255,0.08)';
+    ctx.strokeStyle = 'rgba(126,250,255,0.10)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let t = 0; t < dur; t += bar) {
       const x = (t / dur) * W;
-      ctx.moveTo(x, 0); ctx.lineTo(x, H);
+      ctx.moveTo(x, 0); ctx.lineTo(x, playH);
     }
     ctx.stroke();
   }
@@ -110,4 +134,42 @@ function drawPreview(canvas, notes, duration, bpm) {
       ctx.fillRect(x, y + 1, Math.max(2, 2.2), h - 2);
     }
   }
+
+  ctx.fillStyle = '#06101e';
+  ctx.fillRect(0, playH, W, axisH);
+  ctx.fillStyle = '#5a89a6';
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.textBaseline = 'middle';
+  const step = dur > 90 ? 15 : dur > 40 ? 10 : 5;
+  for (let t = 0; t <= dur + 0.01; t += step) {
+    const x = (t / dur) * W;
+    ctx.fillStyle = '#1a3458';
+    ctx.fillRect(x, playH, 1, 4);
+    ctx.fillStyle = '#5a89a6';
+    const label = Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0');
+    ctx.fillText(label, Math.min(W - 28, x + 2), playH + axisH / 2);
+  }
+}
+
+function drawWaveform(ctx, buffer, W, H) {
+  if (!buffer || !buffer.length) return;
+  const ch = buffer.getChannelData(0);
+  const step = Math.max(1, Math.floor(ch.length / W));
+  ctx.strokeStyle = 'rgba(0, 229, 255, 0.18)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = 0; x < W; x++) {
+    let min = 1, max = -1;
+    const start = x * step;
+    for (let i = 0; i < step && start + i < ch.length; i++) {
+      const v = ch[start + i];
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    const y0 = H / 2 + min * H * 0.42;
+    const y1 = H / 2 + max * H * 0.42;
+    ctx.moveTo(x + 0.5, y0);
+    ctx.lineTo(x + 0.5, y1);
+  }
+  ctx.stroke();
 }

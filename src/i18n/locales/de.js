@@ -120,6 +120,7 @@ export const de = {
     previewNotes: '{n} Noten',
     previewHolds: '{n} Halten',
     previewDensity: '{n}/s',
+    previewHint: 'Leertaste / Enter — spielen · Esc — zurück',
   },
   hud: {
     score: 'PUNKTE', accuracy: 'GEN', combo: 'COMBO',
@@ -156,7 +157,7 @@ export const de = {
     fps: 'BPS Ø/1%/min',
     fpsTitle: 'Durchschnitt / 1% niedrig / min. Bilder pro Sekunde',
     prevBest: 'Vorheriger Rekord', newBest: 'NEUER REKORD!',
-    playAgain: 'Nochmal spielen', exportMap: '📤 Map exportieren',
+    playAgain: 'Nochmal spielen', backToMenu: '← Menü', exportMap: '📤 Map exportieren',
     hitChart: 'TREFFER-HISTOGRAMM',
     footer: 'Auto-BPM-Synchronisierung an. Ändere „Vorlauf" Langsam/Normal/Schnell nach Wunsch.',
     early: '{ms} ms früh', late: '{ms} ms spät',

@@ -118,6 +118,7 @@ export const fr = {
     previewNotes: '{n} notes',
     previewHolds: '{n} tenues',
     previewDensity: '{n}/s',
+    previewHint: 'Espace / Entrée — jouer · Échap — retour',
   },
   hud: {
     score: 'SCORE', accuracy: 'PRÉC', combo: 'COMBO',
@@ -151,7 +152,7 @@ export const fr = {
     fps: 'IPS moy/1%/min',
     fpsTitle: 'moyenne / 1% bas / minimum IPS pendant le jeu',
     prevBest: 'Meilleur précédent', newBest: 'NOUVEAU RECORD !',
-    playAgain: 'Rejouer', exportMap: '📤 Exporter la map',
+    playAgain: 'Rejouer', backToMenu: '← Menu', exportMap: '📤 Exporter la map',
     hitChart: 'HISTOGRAMME DES COUPS',
     footer: 'Sync auto BPM active. Change « Anticipation » Lent/Normal/Rapide selon tes préférences.',
     early: '{ms} ms en avance', late: '{ms} ms en retard',
