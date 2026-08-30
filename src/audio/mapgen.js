@@ -49,7 +49,7 @@ function classifyOnset(bands) {
   const highShare = f[B_HIGH_MID] + f[B_HIGH];
   const midShare = f[B_MID];
 
-  if (lowShare > 0.55 && highShare < 0.20) return 'kick';
+  if (lowShare > 0.48 && highShare < 0.22) return 'kick';
   // Snare: strong low-mid (200-500) + high-mid crack; less sub-bass
   if (f[B_LOW_MID] > 0.20 && highShare > 0.20 && lowShare < 0.45) return 'snare';
   // Hi-hat / cymbal: dominant high

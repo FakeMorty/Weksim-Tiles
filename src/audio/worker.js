@@ -2,15 +2,15 @@
 // Runs off the main thread so UI stays responsive during multi-second analysis.
 
 import { computeSpectrogram } from './stft.js';
-import { computeMultibandFlux, weightedFlux, MODE_WEIGHTS, NUM_BANDS } from './spectralFlux.js';
+import { computeMultibandFlux, weightedFlux, MODE_WEIGHTS, NUM_BANDS, computeSuperflux, blendNovelty } from './spectralFlux.js';
 import { pickPeaksAdaptive } from './onsets.js';
 import { estimateBPM } from './bpm.js';
 import { percussiveEnhance, computeHpssMasks, computeHpssIterative, suggestHpssWindows, snapToBeatGrid, dedupeClose } from './percussive.js';
 import { trackBeats, snapToTrackedBeats } from './beatTracking.js';
 import { localTempoCurve, buildPLPCurve, extractBeats, detectDownbeats } from './plp.js';
-import { trackPitch, findStablePitchRegions } from './pitch.js';
+import { trackPitch, findStablePitchRegions, detectPitchOnsets, mergePitchIntoOnsets } from './pitch.js';
 import { buildHarmonicEnvelopes } from './holds.js';
-import { buildSourceEnvelopes, mergeSourceOnsets, pickPrimary } from './sources.js';
+import { buildSourceEnvelopes, mergeSourceOnsets, pickPrimary, fuseOnsets } from './sources.js';
 import { refineSourcesNMF } from './nmf.js';
 
 self.onmessage = async (e) => {
@@ -28,29 +28,40 @@ self.onmessage = async (e) => {
 
     const FRAME = 2048;
     const HOP = 512;
+    const durationSec = pcm.length / sampleRate;
     const spec = computeSpectrogram(pcm, FRAME, HOP);
     const framesPerSec = sampleRate / HOP;
 
-    // Etap 2: HPSS with quality modes. Default window sizes; a second pass
-    // below refines them once we know the tempo.
+    // Coarse tempo from raw magnitude so HPSS median windows match the
+    // actual groove instead of always assuming 120 BPM.
+    postProgress(0.12, 'tempo');
+    const { fluxTotal: coarseFlux } = computeMultibandFlux(spec, sampleRate);
+    const coarseBpm = estimateBPM(coarseFlux, [], framesPerSec).bpm || 120;
+
+    // Etap 2: HPSS with quality modes.
     // 'off'       = no separation (fastest, works on clean tracks)
     // 'hard'      = per-bin sharp mask (v1.9 default, good for drums-heavy)
     // 'soft'      = Wiener-like smooth mask (better on mixed content)
     // 'iterative' = two-pass soft refinement (best quality, slowest)
     let usedMag = spec.mag;
     let harmonicEnvelopes = null;
-    let percussiveMag = null;   // Etap C: kept for source separation
+    let percussiveMag = null;
     let harmonicMag  = null;
     if (hpssMode !== 'off') {
       postProgress(0.20, 'hpss');
-      const { winFreq, winTime } = suggestHpssWindows(120); // preliminary
+      const { winFreq, winTime } = suggestHpssWindows(coarseBpm);
+      // Vocals: a hard mask punches holes in formants. Soft Wiener keeps
+      // harmonic energy while still peeling drums off the spectrum.
+      const hpssKind = (mode === 'vocal' && hpssMode === 'hard') ? 'soft' : hpssMode;
       let masks;
-      if (hpssMode === 'iterative') {
+      if (hpssKind === 'iterative') {
         masks = computeHpssIterative(spec.mag, spec.numFrames, spec.numBins, winFreq, winTime, 'soft');
       } else {
-        masks = computeHpssMasks(spec.mag, spec.numFrames, spec.numBins, winFreq, winTime, true, hpssMode);
+        masks = computeHpssMasks(spec.mag, spec.numFrames, spec.numBins, winFreq, winTime, true, hpssKind);
       }
-      usedMag = (mode !== 'vocal') ? masks.percussive : spec.mag;
+      usedMag = (mode === 'vocal')
+        ? (masks.harmonic || spec.mag)
+        : (masks.percussive || spec.mag);
       percussiveMag = masks.percussive;
       harmonicMag  = masks.harmonic;
       harmonicEnvelopes = buildHarmonicEnvelopes(
@@ -59,31 +70,54 @@ self.onmessage = async (e) => {
     }
     postProgress(0.30, 'pitch');
 
-    // Etap B (v1.21): YIN pitch tracking. Runs on original PCM (or on the
-    // harmonic component if HPSS is on — it's cleaner). Finds stable-pitch
-    // regions that mark real held notes (vocals, sustained synths, etc.).
-    // Cost: ~200-400ms on a 4-min track. Skipped in 'drums' mode where
-    // there's usually no melodic content worth tracking.
+    // YIN pitch tracking. Skipped in drums mode (unpitched). Also used
+    // later as extra syllable onsets for vocal/classic.
     let pitchRegions = [];
+    let pitchTrack = null;
     if (mode !== 'drums') {
-      const pitchTrack = trackPitch(pcm, sampleRate, HOP, FRAME);
-      const framesPerSec = sampleRate / HOP;
-      pitchRegions = findStablePitchRegions(pitchTrack, framesPerSec, 0.6, 0.28);
+      pitchTrack = trackPitch(pcm, sampleRate, HOP, FRAME);
+      pitchRegions = findStablePitchRegions(
+        pitchTrack, framesPerSec, 0.6, mode === 'vocal' ? 0.22 : 0.28
+      );
     }
 
     postProgress(0.35, 'flux');
 
     const percSpec = { ...spec, mag: usedMag };
-    const { fluxBands, fluxTotal } = computeMultibandFlux(percSpec, sampleRate);
-    postProgress(0.55, 'novelty');
-
+    const { fluxBands } = computeMultibandFlux(percSpec, sampleRate);
     const weights = MODE_WEIGHTS[mode] || MODE_WEIGHTS.classic;
-    const novelty = weightedFlux(fluxBands, weights);
+    const bandNovelty = weightedFlux(fluxBands, weights);
+
+    postProgress(0.50, 'superflux');
+    const sfOpts = mode === 'vocal'
+      ? { muBins: 2, minHz: 180, maxHz: 5000 }
+      : mode === 'drums'
+        ? { muBins: 3, minHz: 30, maxHz: 5500 }
+        : { muBins: 3, minHz: 20, maxHz: 12000 };
+    const sf = computeSuperflux(percSpec, sampleRate, sfOpts);
+
+    let novelty;
+    if (mode === 'classic' && harmonicMag) {
+      const sfH = computeSuperflux({ ...spec, mag: harmonicMag }, sampleRate, { muBins: 2, minHz: 180, maxHz: 5000 });
+      novelty = blendNovelty([
+        { sig: sf, weight: 0.55 },
+        { sig: sfH, weight: 0.25 },
+        { sig: bandNovelty, weight: 0.20 },
+      ]);
+    } else if (mode === 'vocal') {
+      novelty = blendNovelty([
+        { sig: sf, weight: 0.70 },
+        { sig: bandNovelty, weight: 0.30 },
+      ]);
+    } else {
+      novelty = blendNovelty([
+        { sig: sf, weight: 0.85 },
+        { sig: bandNovelty, weight: 0.15 },
+      ]);
+    }
     postProgress(0.65, 'onsets');
 
     // sens 0.5 → very sensitive (alpha ~1.15) · 2.5 → very strict (alpha ~2.2)
-    // Mode-specific base alpha: DRUMS gets a higher floor because drums
-    // fire on every subdivision — we want only the strongest hits.
     const modeAlphaBoost = mode === 'drums' ? 0.35 : mode === 'vocal' ? 0.10 : 0;
     const alpha = 1.10 + (sens - 0.5) * 0.55 + modeAlphaBoost;
     const onsetOpts = {
@@ -91,9 +125,10 @@ self.onmessage = async (e) => {
       alpha,
       delta: mode === 'drums' ? 0.04 : 0.02,
       preMedSec:  mode === 'drums' ? 0.40 : 0.50,
-      minGapSec:  mode === 'drums' ? 0.130 : mode === 'vocal' ? 0.160 : 0.110,
+      minGapSec:  mode === 'drums' ? 0.130 : mode === 'vocal' ? 0.140 : 0.110,
+      neigh: 1,
     };
-    let rawOnsets = pickPeaksAdaptive(novelty, onsetOpts, 1.2);
+    let rawOnsets = pickPeaksAdaptive(novelty, onsetOpts, mode === 'vocal' ? 1.0 : 1.2);
 
     // Etap C (v1.22): Source separation. Build per-instrument envelopes,
     // run onset detection on each, merge into a single tagged stream.
@@ -155,40 +190,43 @@ self.onmessage = async (e) => {
       // Per-source onset params: kick wants tight, snare medium, hats loose,
       // melody wants long refractory so it doesn't fire per-note vibrato.
       const perSourceOpts = {
-        kick:   { framesPerSec, alpha: 1.35, delta: 0.03, preMedSec: 0.40, minGapSec: 0.150 },
-        snare:  { framesPerSec, alpha: 1.30, delta: 0.03, preMedSec: 0.40, minGapSec: 0.180 },
-        hihat:  { framesPerSec, alpha: 1.45, delta: 0.04, preMedSec: 0.30, minGapSec: 0.090 },
-        melody: { framesPerSec, alpha: 1.55, delta: 0.04, preMedSec: 0.60, minGapSec: 0.220 },
+        kick:   { framesPerSec, alpha: 1.30, delta: 0.03, preMedSec: 0.40, minGapSec: 0.150, neigh: 1 },
+        snare:  { framesPerSec, alpha: 1.28, delta: 0.03, preMedSec: 0.40, minGapSec: 0.180, neigh: 1 },
+        hihat:  { framesPerSec, alpha: 1.65, delta: 0.05, preMedSec: 0.30, minGapSec: 0.110, neigh: 1 },
+        melody: { framesPerSec, alpha: 1.45, delta: 0.03, preMedSec: 0.55, minGapSec: 0.180, neigh: 1 },
       };
 
       const bySource = {};
       if (mode !== 'vocal') {
-        bySource.kick  = pickPeaksAdaptive(src.kick,  perSourceOpts.kick,  0.6);
+        bySource.kick  = pickPeaksAdaptive(src.kick,  perSourceOpts.kick,  0.7);
         bySource.snare = pickPeaksAdaptive(src.snare, perSourceOpts.snare, 0.5);
-        bySource.hihat = pickPeaksAdaptive(src.hihat, perSourceOpts.hihat, 0.8);
+        bySource.hihat = pickPeaksAdaptive(src.hihat, perSourceOpts.hihat, 0.45);
       }
       if (mode !== 'drums') {
-        bySource.melody = pickPeaksAdaptive(src.melody, perSourceOpts.melody, 0.4);
+        bySource.melody = pickPeaksAdaptive(src.melody, perSourceOpts.melody, mode === 'vocal' ? 0.7 : 0.4);
       }
 
       const merged = mergeSourceOnsets(bySource, 40);
-
-      // Only replace the main onset list if separation produced a
-      // reasonable number of events (avoid catastrophic degradation on
-      // weird tracks). Keep both for diagnostics.
-      const rawCount = rawOnsets.length;
-      const mergedCount = merged.length;
-      const ratio = rawCount > 0 ? mergedCount / rawCount : 0;
-      if (mergedCount >= 20 && ratio > 0.30 && ratio < 3.0) {
-        rawOnsets = merged.map(m => ({
+      const fused = fuseOnsets(rawOnsets, merged, mode, durationSec);
+      if (fused !== rawOnsets) {
+        rawOnsets = fused.map(m => ({
           frame: m.frame,
           time: m.time,
           strength: m.strength,
           primary: m.primary,
           sources: m.sources,
         }));
-        sourceOnsets = merged;
+        sourceOnsets = fused;
         sourcesUsed = Object.keys(bySource);
+      }
+    }
+
+    if (mode !== 'drums' && pitchTrack) {
+      const pitchOns = detectPitchOnsets(pitchTrack, framesPerSec, {
+        minGapSec: mode === 'vocal' ? 0.12 : 0.16,
+      });
+      if (pitchOns.length) {
+        rawOnsets = mergePitchIntoOnsets(rawOnsets, pitchOns, mode === 'vocal' ? 0.080 : 0.100);
       }
     }
 
@@ -301,7 +339,6 @@ self.onmessage = async (e) => {
     const onsetTimes = snappedOnsets.map(o => o.time);
     const onsetStrengths = new Float32Array(snappedOnsets.map(o => o.strength));
 
-    const durationSec = pcm.length / sampleRate;
     // Etap 3: pass compact envelopes (~200 KB total) instead of the full
     // harmonic spectrogram (~80 MB) — huge transfer win.
     const transferables = [onsetStrengths.buffer, novelty.buffer];

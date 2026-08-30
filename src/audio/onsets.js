@@ -71,25 +71,32 @@ export function pickPeaks(novelty, opts) {
   const peaks = [];
   let lastPeakFrame = -Infinity;
 
-  for (let i = Math.max(preAvg, 2); i < N - Math.max(postAvg, 2); i++) {
+  const neigh = opts.neigh ?? 2;
+  for (let i = Math.max(preAvg, neigh); i < N - Math.max(postAvg, neigh); i++) {
     const v = smoothed[i];
     const thr = localMedian[i] * alpha + delta;
     if (v < thr) continue;
-    // Local maximum within ±3 frames
-    if (v < smoothed[i - 1] || v < smoothed[i + 1]) continue;
-    if (v < smoothed[i - 2] || v < smoothed[i + 2]) continue;
-    // Refractory
+    let isMax = v >= smoothed[i - 1] && v >= smoothed[i + 1];
+    for (let d = 2; d <= neigh && isMax; d++) {
+      if (v < smoothed[i - d] || v < smoothed[i + d]) isMax = false;
+    }
+    if (!isMax) continue;
+    const v0 = smoothed[i - 1], v2 = smoothed[i + 1];
+    const denom = (v0 - 2 * v + v2);
+    let shift = denom === 0 ? 0 : 0.5 * (v0 - v2) / denom;
+    if (shift > 0.5) shift = 0.5;
+    if (shift < -0.5) shift = -0.5;
+    const time = (i + shift) / framesPerSec;
     if (i - lastPeakFrame < minGap) {
-      // If this peak is stronger than the previous, replace it
       const last = peaks[peaks.length - 1];
       if (last && v > last.strength) {
         peaks.pop();
-        peaks.push({ frame: i, time: i / framesPerSec, strength: v });
+        peaks.push({ frame: i, time, strength: v });
         lastPeakFrame = i;
       }
       continue;
     }
-    peaks.push({ frame: i, time: i / framesPerSec, strength: v });
+    peaks.push({ frame: i, time, strength: v });
     lastPeakFrame = i;
   }
   return peaks;

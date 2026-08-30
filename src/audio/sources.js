@@ -6,10 +6,10 @@
 // clever band-limited energy envelopes that respond to specific instrument
 // families:
 //
-//   kick   — sub-bass, percussive only            (20-100 Hz, P mask)
-//   snare  — low-mid crack + high-mid body        (150-500 + 2k-5k, P mask)
-//   hihat  — high-frequency percussive            (6k-16k, P mask)
-//   melody — mid-band harmonic (vocals+lead)      (200-4k, H mask)
+//   kick   — kick body, percussive only           (30-120 Hz, P mask)
+//   snare  — low-mid body × high-mid crack        (180-450 × 2.5k-5.5k, P mask)
+//   hihat  — high-frequency percussive            (7k-16k, P mask)
+//   melody — mid-band harmonic (vocals+lead)      (180-4k + presence 800-3.5k, H mask)
 //
 // Each stream is a per-frame energy envelope. Onset detection then runs on
 // each stream independently with parameters tuned to that instrument, and
@@ -34,19 +34,21 @@ import { hzToBin } from './stft.js';
  */
 export function buildSourceEnvelopes(magP, magH, numFrames, numBins, sr, frameSize) {
   // Bin ranges for each source
-  const kLoKick   = Math.max(1, hzToBin(20,   sr, frameSize));
-  const kHiKick   = Math.min(numBins - 1, hzToBin(100,  sr, frameSize));
+  const kLoKick   = Math.max(1, hzToBin(30,   sr, frameSize));
+  const kHiKick   = Math.min(numBins - 1, hzToBin(120,  sr, frameSize));
 
-  const kLoSnare1 = hzToBin(150,  sr, frameSize);
-  const kHiSnare1 = hzToBin(500,  sr, frameSize);
-  const kLoSnare2 = hzToBin(2000, sr, frameSize);
-  const kHiSnare2 = hzToBin(5000, sr, frameSize);
+  const kLoSnare1 = hzToBin(180,  sr, frameSize);
+  const kHiSnare1 = hzToBin(450,  sr, frameSize);
+  const kLoSnare2 = hzToBin(2500, sr, frameSize);
+  const kHiSnare2 = hzToBin(5500, sr, frameSize);
 
-  const kLoHat    = hzToBin(6000, sr, frameSize);
+  const kLoHat    = hzToBin(7000, sr, frameSize);
   const kHiHat    = Math.min(numBins - 1, hzToBin(16000, sr, frameSize));
 
-  const kLoMel    = hzToBin(200,  sr, frameSize);
+  const kLoMel    = hzToBin(180,  sr, frameSize);
   const kHiMel    = hzToBin(4000, sr, frameSize);
+  const kLoPres   = hzToBin(800,  sr, frameSize);
+  const kHiPres   = hzToBin(3500, sr, frameSize);
 
   const kick   = new Float32Array(numFrames);
   const snare  = new Float32Array(numFrames);
@@ -78,10 +80,11 @@ export function buildSourceEnvelopes(magP, magH, numFrames, numBins, sr, frameSi
     for (let k = kLoHat; k < kHiHat; k++) sHat += source[base + k];
     hihat[f] = sHat;
 
-    // Melody — mid-band harmonic component
-    let sMel = 0;
+    // Melody — mid-band harmonic + extra weight on vocal presence (800–3.5k)
+    let sMel = 0, sPres = 0;
     for (let k = kLoMel; k < kHiMel; k++) sMel += harmonicSource[base + k];
-    melody[f] = sMel;
+    for (let k = kLoPres; k < kHiPres; k++) sPres += harmonicSource[base + k];
+    melody[f] = sMel + 0.55 * sPres;
   }
 
   // Half-wave-rectified flux (novelty) for each stream. This is what the
@@ -103,10 +106,13 @@ export function buildSourceEnvelopes(magP, magH, numFrames, numBins, sr, frameSi
 function fluxOfEnvelope(env) {
   const N = env.length;
   const out = new Float32Array(N);
-  const C = 1000;
+  const C = 10;
+  let prev = Math.log1p(C * env[0]);
   for (let i = 1; i < N; i++) {
-    const d = env[i] - env[i - 1];
-    if (d > 0) out[i] = Math.log1p(C * d);
+    const cur = Math.log1p(C * env[i]);
+    const d = cur - prev;
+    if (d > 0) out[i] = d;
+    prev = cur;
   }
   return out;
 }
@@ -169,4 +175,51 @@ export function pickPrimary(sources) {
     if (sources.includes(s)) return s;
   }
   return sources[0];
+}
+
+/**
+ * Mode-aware fusion of novelty peaks and source-separated onsets.
+ *
+ * The old pipeline did an all-or-nothing replace when the count ratio
+ * looked "reasonable". That threw away a good novelty stream on mixed
+ * tracks and kept a bad one on drums. Per-mode rules:
+ *
+ *   drums  — trust kick+snare; keep hats only if they aren't sitting
+ *            on top of a kick/snare (otherwise 16ths flood the map)
+ *   vocal  — melody stream only
+ *   classic — source merge if density is in a sane band, else novelty
+ *
+ * Returns the same object identity as `noveltyOnsets` when falling back,
+ * so the caller can detect "fusion declined".
+ */
+export function fuseOnsets(noveltyOnsets, sourceOnsets, mode, durationSec) {
+  const duration = Math.max(1, durationSec || 1);
+  if (!sourceOnsets || !sourceOnsets.length) return noveltyOnsets;
+
+  if (mode === 'drums') {
+    const kicks  = sourceOnsets.filter(o => o.primary === 'kick');
+    const snares = sourceOnsets.filter(o => o.primary === 'snare');
+    const hats   = sourceOnsets.filter(o => o.primary === 'hihat');
+    const pulse  = kicks.concat(snares);
+    const keptHats = hats.filter(h =>
+      !pulse.some(p => Math.abs(p.time - h.time) < 0.045)
+    );
+    const merged = mergeSourceOnsets({ kick: kicks, snare: snares, hihat: keptHats }, 32);
+    const nps = merged.length / duration;
+    if (merged.length >= 12 && nps >= 0.35 && nps < 10) return merged;
+    return noveltyOnsets;
+  }
+
+  if (mode === 'vocal') {
+    const mel = sourceOnsets.filter(o =>
+      o.primary === 'melody' || (o.sources || []).includes('melody')
+    );
+    const nps = mel.length / duration;
+    if (mel.length >= 8 && nps < 8) return mel;
+    return noveltyOnsets;
+  }
+
+  const ratio = sourceOnsets.length / Math.max(1, noveltyOnsets.length);
+  if (sourceOnsets.length >= 16 && ratio > 0.35 && ratio < 2.5) return sourceOnsets;
+  return noveltyOnsets;
 }

@@ -95,7 +95,7 @@ export function detectHolds(onsets, envelopes, framesPerSec,
 
   // Per-mode parameters + which envelope to use
   const params = modeStr === 'vocal'
-    ? { env: envelopes.eVocal,   minHold: 0.35, maxHold: 2.20, probMul: 1.6 }
+    ? { env: envelopes.eVocal,   minHold: 0.28, maxHold: 2.20, probMul: 1.6 }
     : modeStr === 'classic'
       ? { env: envelopes.eClassic, minHold: 0.34, maxHold: 1.60, probMul: 1.0 }
       : { env: envelopes.eDrums,   minHold: 0.28, maxHold: 1.00, probMul: 0.55 };
@@ -138,7 +138,7 @@ export function detectHolds(onsets, envelopes, framesPerSec,
       for (const region of pitchRegions) {
         // Region must start within ±80ms of the onset (tolerates snap slop)
         if (region.startSec < t - 0.05) continue;
-        if (region.startSec > t + 0.08) break; // regions are sorted
+        if (region.startSec > t + (modeStr === 'vocal' ? 0.12 : 0.08)) break;
         // Only take stable ones (weak vibrato is fine, wild pitch drift isn't)
         if (region.stability < 0.35) continue;
         const regionDur = region.endSec - region.startSec;

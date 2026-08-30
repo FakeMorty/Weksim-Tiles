@@ -52,14 +52,20 @@ export async function sha1(bytes) {
   return s;
 }
 
+// Bump this whenever onset / source / HPSS behaviour changes so IndexedDB
+// does not serve maps built by a previous algorithm.
+export const ANALYZER_ALGO = 'sf1';
+
 // Build a cache key that reflects EVERY analyzer input that changes output.
 // Sensitivity and hold-mode change note count, so they're in the key too.
 export function buildKey(fileHash, opts) {
   return [
+    ANALYZER_ALGO,
     fileHash,
     opts.mode,
     opts.difficulty,
     opts.hpssMode,
+    opts.nmfMode || 'auto',
     'sens' + Math.round(opts.sens * 100),
     'hold' + opts.holdMode,
     opts.holdEnable ? 'h1' : 'h0',

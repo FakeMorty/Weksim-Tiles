@@ -1,5 +1,4 @@
-// Multiband spectral flux. Splits the positive-half spectrum into 6 perceptual
-// bands and computes half-wave-rectified log-compressed flux per band + total.
+// Multiband spectral flux + Superflux (Böck & Widmer 2013).
 //
 // Bands (Hz):
 //   0 sub-bass    20 – 60     (kick fundamentals)
@@ -14,7 +13,6 @@ import { hzToBin } from './stft.js';
 export const BAND_EDGES = [20, 60, 250, 500, 2000, 4000, 16000];
 export const NUM_BANDS = BAND_EDGES.length - 1;
 
-// Precompute (lowBin, highBin) per band for a given sr + N.
 function bandRanges(sr, N) {
   const numBins = N / 2 + 1;
   const ranges = [];
@@ -26,17 +24,15 @@ function bandRanges(sr, N) {
   return ranges;
 }
 
-// Compute per-band spectral flux from a spectrogram { mag, numFrames, numBins }.
-// Returns { fluxBands: Float32Array[NUM_BANDS], fluxTotal: Float32Array }.
-// Each array has length numFrames; flux[0] is 0 (no previous frame).
-export function computeMultibandFlux(spec, sr) {
+// Log-compress then half-wave-rectified positive difference per band.
+// Logging BEFORE the difference (not after summing) matches the Superflux
+// paper and stops loud broadband frames from drowning quiet onsets.
+export function computeMultibandFlux(spec, sr, { logGamma = 10 } = {}) {
   const { mag, numFrames, numBins, frameSize } = spec;
   const ranges = bandRanges(sr, frameSize);
   const fluxBands = [];
   for (let b = 0; b < NUM_BANDS; b++) fluxBands.push(new Float32Array(numFrames));
   const fluxTotal = new Float32Array(numFrames);
-
-  const C = 1000; // log compression constant
 
   for (let f = 1; f < numFrames; f++) {
     const cur  = f * numBins;
@@ -45,19 +41,51 @@ export function computeMultibandFlux(spec, sr) {
       const [lo, hi] = ranges[b];
       let sum = 0;
       for (let k = lo; k < hi; k++) {
-        const d = mag[cur + k] - mag[prev + k];
+        const d = Math.log1p(logGamma * mag[cur + k]) - Math.log1p(logGamma * mag[prev + k]);
         if (d > 0) sum += d;
       }
-      const compressed = Math.log1p(C * sum);
-      fluxBands[b][f] = compressed;
-      fluxTotal[f]   += compressed;
+      fluxBands[b][f] = sum;
+      fluxTotal[f]   += sum;
     }
   }
   return { fluxBands, fluxTotal };
 }
 
-// Weighted sum of bands into a single novelty function, according to a mode.
-// Weights are per-band multipliers. Missing bands default to 1.
+// Superflux: max-filter the previous log-spectrum across nearby frequency
+// bins, then take the positive difference. Suppresses vibrato / tremolo
+// false onsets and sharpens drum transients.
+export function computeSuperflux(spec, sr, { muBins = 3, logGamma = 10, minHz = 20, maxHz = 16000 } = {}) {
+  const { mag, numFrames, numBins, frameSize } = spec;
+  const N = frameSize || (numBins - 1) * 2;
+  const flux = new Float32Array(numFrames);
+  const kMin = Math.max(1, hzToBin(minHz, sr, N));
+  const kMax = Math.min(numBins - 1, Math.max(kMin + 1, hzToBin(maxHz, sr, N)));
+  const prevMax = new Float32Array(numBins);
+  const mu = Math.max(1, muBins | 0);
+
+  for (let f = 1; f < numFrames; f++) {
+    const prev = (f - 1) * numBins;
+    const cur  = f * numBins;
+    for (let k = kMin; k <= kMax; k++) {
+      let m = 0;
+      const lo = Math.max(kMin, k - mu);
+      const hi = Math.min(kMax, k + mu);
+      for (let j = lo; j <= hi; j++) {
+        const v = Math.log1p(logGamma * mag[prev + j]);
+        if (v > m) m = v;
+      }
+      prevMax[k] = m;
+    }
+    let sum = 0;
+    for (let k = kMin; k <= kMax; k++) {
+      const d = Math.log1p(logGamma * mag[cur + k]) - prevMax[k];
+      if (d > 0) sum += d;
+    }
+    flux[f] = sum;
+  }
+  return flux;
+}
+
 export function weightedFlux(fluxBands, weights) {
   const N = fluxBands[0].length;
   const out = new Float32Array(N);
@@ -70,12 +98,46 @@ export function weightedFlux(fluxBands, weights) {
   return out;
 }
 
-// Mode presets. drums = kick+snare focus, hats de-emphasised (they trigger
-// on every 8th/16th note and would flood the map). vocal = mid/high-mid.
-// classic = balanced. Weights tuned in v1.8 after user feedback about
-// "too many notes on drum-heavy tracks".
+export function medianValue(sig) {
+  const n = sig.length;
+  if (!n) return 1e-9;
+  const tmp = Array.from(sig);
+  tmp.sort((a, b) => a - b);
+  const mid = tmp[n >> 1];
+  return mid > 1e-9 ? mid : 1e-9;
+}
+
+export function scaleToMedian(sig, target = 1) {
+  const g = target / medianValue(sig);
+  const out = new Float32Array(sig.length);
+  for (let i = 0; i < sig.length; i++) out[i] = sig[i] * g;
+  return out;
+}
+
+export function blendNovelty(parts) {
+  // parts: [{ sig, weight }, ...] — each scaled to median 1 then mixed.
+  const n = parts[0].sig.length;
+  const out = new Float32Array(n);
+  let wsum = 0;
+  for (const p of parts) {
+    if (!p || !p.sig || !p.weight) continue;
+    const scaled = scaleToMedian(p.sig, 1);
+    const w = p.weight;
+    wsum += w;
+    for (let i = 0; i < n; i++) out[i] += scaled[i] * w;
+  }
+  if (wsum > 0 && wsum !== 1) {
+    const inv = 1 / wsum;
+    for (let i = 0; i < n; i++) out[i] *= inv;
+  }
+  return out;
+}
+
+// drums: kick+snare body, hats almost off (they flood 16th-note maps).
+// vocal: formant / presence, almost no kick.
+// classic: balanced, hats still de-emphasised.
 export const MODE_WEIGHTS = {
-  drums:   [1.5, 2.0, 1.1, 0.4, 0.3, 0.15],
-  classic: [1.0, 1.1, 1.0, 1.0, 0.9, 0.5],
-  vocal:   [0.2, 0.3, 0.8, 1.6, 1.8, 0.7],
+  drums:   [2.1, 2.3, 1.35, 0.28, 0.40, 0.06],
+  classic: [1.15, 1.25, 1.05, 1.00, 0.85, 0.32],
+  vocal:   [0.06, 0.12, 0.75, 1.85, 2.15, 0.45],
 };
