@@ -1,32 +1,53 @@
 // Keyboard + pointer input. Delegates to judge.js.
 
-import { KEY_MAP, LANES } from '../config.js';
+import { LANES } from '../config.js';
 import { state } from './state.js';
 import { pressDown, pressUp } from './judge.js';
 import { view, laneMetrics } from '../utils/canvas.js';
-import { pauseGame, resumeGame } from './loop.js';
+import { pauseGame, resumeGame, restartCurrent } from './loop.js';
+import { laneFromCode } from './keys.js';
 
 export function bindInput() {
   window.addEventListener('keydown', e => {
     if (!state.gameRunning) return;
     if (e.code === 'Escape') {
-      // Toggle pause on ESC
       if (state.paused) resumeGame(); else pauseGame();
       e.preventDefault();
       return;
     }
-    if (state.paused) return; // ignore lane keys while paused
-    const lane = KEY_MAP[e.code];
+    if (state.paused) {
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'BUTTON' || tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.code === 'Space' || e.code === 'Enter') {
+        e.preventDefault();
+        resumeGame();
+      } else if (e.code === 'KeyR') {
+        e.preventDefault();
+        restartCurrent();
+      }
+      return;
+    }
+    const lane = laneFromCode(e.code);
     if (lane === undefined) return;
     e.preventDefault();
     if (e.repeat) return;
     pressDown(lane);
   });
   window.addEventListener('keyup', e => {
-    if (state.paused) return;
-    const lane = KEY_MAP[e.code];
+    const lane = laneFromCode(e.code);
     if (lane === undefined) return;
     e.preventDefault();
+    if (state.paused) {
+      // Clear physical key state without judging — audio clock is frozen,
+      // so finishing a HOLD here would score against paused time.
+      state.keysDown[lane] = false;
+      const el = document.getElementById('lk' + lane);
+      if (el) {
+        el.classList.remove('active');
+        el.classList.remove('holding');
+      }
+      return;
+    }
     pressUp(lane);
   });
 
@@ -42,16 +63,24 @@ export function bindInput() {
     e.preventDefault();
   });
   canvas.addEventListener('pointerup', e => {
-    if (state.paused) return;
     const lane = pointerMap.get(e.pointerId);
     pointerMap.delete(e.pointerId);
-    if (lane != null && state.gameRunning) pressUp(lane);
+    if (lane == null) return;
+    if (state.paused) {
+      state.keysDown[lane] = false;
+      return;
+    }
+    if (state.gameRunning) pressUp(lane);
   });
   canvas.addEventListener('pointercancel', e => {
-    if (state.paused) return;
     const lane = pointerMap.get(e.pointerId);
     pointerMap.delete(e.pointerId);
-    if (lane != null && state.gameRunning) pressUp(lane);
+    if (lane == null) return;
+    if (state.paused) {
+      state.keysDown[lane] = false;
+      return;
+    }
+    if (state.gameRunning) pressUp(lane);
   });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
 }

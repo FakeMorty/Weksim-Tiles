@@ -5,6 +5,7 @@ import { clearCache } from '../audio/cache.js';
 import { exportMap, importMap, downloadMapFile, readMapFile } from '../audio/mapIO.js';
 import { state } from '../game/state.js';
 import { t, getLocale } from '../i18n/i18n.js';
+import { notice } from './notice.js';
 
 const DIFF_COLORS = {
   easy:   { bg: '#0e2b1c', fg: '#7aff99' },
@@ -37,7 +38,7 @@ export function bindStats() {
   clearCacheBtn?.addEventListener('click', async () => {
     if (confirm(t('stats.confirmClearCache'))) {
       await clearCache();
-      alert(t('stats.cacheCleared'));
+      notice(t('stats.cacheCleared'));
     }
   });
 
@@ -53,13 +54,13 @@ export function bindStats() {
       const map = importMap(text);
       // Stash on state so play sequence can consume it instead of running analyzer
       state.pendingImportedMap = map;
-      alert(t('menu.importedAlert', {
+      notice(t('menu.importedAlert', {
         notes: map.notes.length,
         bpm: Math.round(map.bpm),
         filename: map._importMeta?.fileName || '?',
-      }));
+      }), 4200);
     } catch (err) {
-      alert(t('menu.importError', { err: err.message }));
+      notice(t('menu.importError', { err: err.message }), 4200);
     }
     // Reset so same file can be re-imported
     mapFileInput.value = '';
@@ -69,7 +70,7 @@ export function bindStats() {
   const exportBtn = document.getElementById('exportMapBtn');
   exportBtn?.addEventListener('click', () => {
     if (!state.lastAnalysis) {
-      alert(t('menu.noMapToExport'));
+      notice(t('menu.noMapToExport'));
       return;
     }
     const json = exportMap(state.lastAnalysis, {
@@ -90,7 +91,7 @@ export function bindStats() {
   const exportReplayBtn = document.getElementById('exportReplayBtn');
   exportReplayBtn?.addEventListener('click', async () => {
     if (!state.lastReplay) {
-      alert(t('menu.noReplayToExport'));
+      notice(t('menu.noReplayToExport'));
       return;
     }
     const { downloadReplay } = await import('../game/replay.js');
@@ -102,7 +103,7 @@ export function bindStats() {
   const exportVideoBtn = document.getElementById('exportVideoBtn');
   exportVideoBtn?.addEventListener('click', async () => {
     if (!state.lastReplay) {
-      alert(t('menu.noReplayToExport'));
+      notice(t('menu.noReplayToExport'));
       return;
     }
     const { startVideoExport } = await import('./videoExport.js');
@@ -115,7 +116,7 @@ export function bindStats() {
       exportVideoBtn.textContent = '✓ ' + t('menu.videoExported');
     } catch (e) {
       console.error(e);
-      alert(t('common.error') + ': ' + (e.message || e));
+      notice(t('common.error') + ': ' + (e.message || e), 4200);
       exportVideoBtn.textContent = '🎬 ' + t('results.exportVideo');
     } finally {
       setTimeout(() => {

@@ -1,7 +1,8 @@
 // Pause screen wiring: continue / restart / exit, plus master volume slider.
 
 import { resumeGame, restartCurrent, exitToMenu, setVolume } from '../game/loop.js';
-import { settings, saveSettings, fxLevel } from '../game/settings.js';
+import { settings, saveSettings } from '../game/settings.js';
+import { t } from '../i18n/i18n.js';
 import { state } from '../game/state.js';
 
 export function bindPause() {
@@ -132,7 +133,7 @@ function bindWarmup() {
     const n = parseInt(s.value, 10);
     if (n <= 0) { settings.warmup = false; settings.warmupBeats = 4; }
     else { settings.warmup = true; settings.warmupBeats = Math.max(2, Math.min(8, n)); }
-    if (v) v.textContent = n === 0 ? 'off' : String(n);
+    if (v) v.textContent = n === 0 ? t('common.off') : String(n);
     saveSettings();
   });
 }

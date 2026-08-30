@@ -6,23 +6,24 @@
 // Selecting a card sets it as the current track. Play analyses + starts.
 // Bot analyses + starts in autopilot mode.
 
-import { listTracks, removeTrack, onLibraryChange, difficultyStars, guessGenreFromBpm } from '../game/library.js';
+import { listTracks, removeTrack, clearAllTracks, onLibraryChange, difficultyStars, guessGenreFromBpm } from '../game/library.js';
 import { state } from '../game/state.js';
-import { t } from '../i18n/i18n.js';
+import { t, onLocaleChange } from '../i18n/i18n.js';
 
 let onPlayCb = null;
 let onBotCb = null;
+let onSelectCb = null;
 let collapsed = false;
 
 export function bindLibrary(handlers) {
   onPlayCb = handlers.onPlay;
   onBotCb = handlers.onBot;
+  onSelectCb = handlers.onSelect || null;
   const clearBtn = document.getElementById('libClearBtn');
   if (clearBtn) {
     clearBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const tracks = listTracks();
-      for (const tr of tracks) removeTrack(tr.id);
+      clearAllTracks();
     });
   }
   // Header toggles collapse
@@ -36,6 +37,7 @@ export function bindLibrary(handlers) {
     });
   }
   onLibraryChange(render);
+  onLocaleChange(render);
   render();
 }
 
@@ -80,8 +82,8 @@ function makeCard(track, num) {
       <div class="lib-stars">${starRow}</div>
     </div>
     <div class="lib-actions">
-      <button class="lib-btn play" data-i18n="menu.libraryPlay">Play</button>
-      <button class="lib-btn bot" data-i18n="menu.libraryBot" title="Watch bot play">Bot</button>
+      <button class="lib-btn play">${escapeHtml(t('menu.libraryPlay'))}</button>
+      <button class="lib-btn bot">${escapeHtml(t('menu.libraryBot'))}</button>
       <button class="lib-btn del" title="Remove">×</button>
     </div>
   `;
@@ -96,11 +98,20 @@ function makeCard(track, num) {
   });
   card.querySelector('.lib-btn.del').addEventListener('click', (e) => {
     e.stopPropagation();
+    const label = stripExt(track.name);
+    if (!confirm(t('menu.confirmRemoveTrack', { name: label }))) return;
     removeTrack(track.id);
   });
   card.addEventListener('click', () => {
-    state.currentTrackId = track.id;
-    render();
+    if (onSelectCb) onSelectCb(track);
+    else {
+      state.currentTrackId = track.id;
+      render();
+    }
+  });
+  card.addEventListener('dblclick', (e) => {
+    if (e.target.closest('button')) return;
+    if (onPlayCb) onPlayCb(track);
   });
   return card;
 }

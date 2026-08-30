@@ -201,3 +201,60 @@ export function findRegionForOnset(onsetTime, pitchRegions, toleranceSec = 0.08)
   }
   return null;
 }
+
+/**
+ * Turn a YIN f0 track into extra onsets: voicing starts and pitch jumps
+ * (≥ ~2 semitones). These catch syllable attacks that Superflux on the
+ * harmonic spectrum sometimes smears, especially legato vocals.
+ */
+export function detectPitchOnsets(f0Track, framesPerSec, {
+  minJumpSemitones = 1.8,
+  minGapSec = 0.14,
+} = {}) {
+  const N = f0Track.length;
+  const minGap = Math.max(1, Math.round(minGapSec * framesPerSec));
+  const out = [];
+  let lastFrame = -Infinity;
+  for (let i = 1; i < N; i++) {
+    const prev = f0Track[i - 1];
+    const cur = f0Track[i];
+    if (cur <= 0) continue;
+    let isOnset = false;
+    if (prev <= 0) {
+      // Voice onset: require the next frame to still be voiced so a
+      // one-frame YIN glitch doesn't become a note.
+      if (i + 1 >= N || f0Track[i + 1] > 0) isOnset = true;
+    } else {
+      const semi = Math.abs(12 * Math.log2(cur / prev));
+      if (semi >= minJumpSemitones) isOnset = true;
+    }
+    if (!isOnset) continue;
+    if (i - lastFrame < minGap) continue;
+    lastFrame = i;
+    out.push({
+      frame: i,
+      time: i / framesPerSec,
+      strength: 1,
+      primary: 'melody',
+      sources: ['melody'],
+      fromPitch: true,
+    });
+  }
+  return out;
+}
+
+export function mergePitchIntoOnsets(onsets, pitchOns, windowSec = 0.08) {
+  if (!pitchOns || !pitchOns.length) return onsets;
+  const all = onsets.map(o => ({ ...o }));
+  all.sort((a, b) => a.time - b.time);
+  for (const p of pitchOns) {
+    let near = false;
+    for (const o of all) {
+      if (Math.abs(o.time - p.time) < windowSec) { near = true; break; }
+      if (o.time > p.time + windowSec) break;
+    }
+    if (!near) all.push({ ...p });
+  }
+  all.sort((a, b) => a.time - b.time);
+  return all;
+}

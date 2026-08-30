@@ -16,8 +16,18 @@ export const camera = {
 };
 
 // Trigger a shake. Intensity in px, duration in seconds.
+function motionScale() {
+  try {
+    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      return 0.12;
+    }
+  } catch { /* ignore */ }
+  return 1;
+}
+
 export function shake(intensity, duration = 0.25) {
   // Take the stronger of current vs new so PERFECT during BREAK doesn't cancel.
+  intensity *= motionScale();
   const decayFromCurrent = camera._shakeAmp;
   camera._shakeAmp = Math.max(decayFromCurrent, intensity);
   camera._shakeDecay = camera._shakeAmp / Math.max(0.05, duration);
@@ -25,12 +35,14 @@ export function shake(intensity, duration = 0.25) {
 
 // Push zoom target (typically 1.02–1.06). Camera lerps to it, then back.
 export function zoomPulse(target = 1.03, snapBack = true) {
+  if (motionScale() < 1) return;
   camera._zoomTarget = target;
   camera._zoomSnapBack = snapBack;
 }
 
 // Push a tilt in radians (±0.01 is subtle, ±0.03 is strong).
 export function tiltPulse(radians) {
+  if (motionScale() < 1) return;
   camera._tiltTarget = radians;
 }
 

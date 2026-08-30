@@ -42,9 +42,13 @@ export function recordPlay(entry) {
     score:    entry.score || 0,
     accuracy: entry.accuracy || 0,
     maxCombo: entry.maxCombo || 0,
+    marvelous: entry.marvelous || 0,
     perfects: entry.perfects || 0,
+    greats:   entry.greats || 0,
     goods:    entry.goods || 0,
+    oks:      entry.oks || 0,
     misses:   entry.misses || 0,
+    failed:   !!entry.failed,
     holdsOk:  entry.holdsOk || 0,
     holdsTotal: entry.holdsTotal || 0,
     notes:    entry.notes || 0,
@@ -96,12 +100,15 @@ export function recentPlays(limit = 20) {
  */
 export function totalStats() {
   const data = load();
-  const t = { plays: data.plays.length, notesHit: 0, notesTotal: 0, playtimeSec: 0 };
+  const t = { plays: data.plays.length, notesHit: 0, notesTotal: 0, playtimeSec: 0, avgAcc: null };
+  let accSum = 0, accN = 0;
   for (const p of data.plays) {
-    t.notesHit += (p.perfects + p.goods);
+    t.notesHit += (p.perfects + p.goods + (p.marvelous || 0) + (p.greats || 0) + (p.oks || 0));
     t.notesTotal += p.notes;
     t.playtimeSec += p.durationSec;
+    if (typeof p.accuracy === 'number') { accSum += p.accuracy; accN++; }
   }
+  if (accN) t.avgAcc = Math.round(accSum / accN);
   return t;
 }
 

@@ -2,12 +2,15 @@
 
 import { state } from '../game/state.js';
 import { analyzeTrack } from '../audio/analyzer.js';
-import { startPlay } from '../game/loop.js';
 import { APP_VERSION } from '../config.js';
 import { settings } from '../game/settings.js';
 import { t, onLocaleChange } from '../i18n/i18n.js';
-import { addTrack, getTrack, updateTrack, difficultyStars, guessGenreFromBpm } from '../game/library.js';
+import { addTrack, getTrack, updateTrack, listTracks, difficultyStars, guessGenreFromBpm } from '../game/library.js';
 import { bindLibrary, render as renderLibrary } from './library.js';
+import { showPreview } from './preview.js';
+import { notice } from './notice.js';
+import { buildDemoTrack } from '../audio/demoTrack.js';
+import { applyKeyLabels } from '../game/keys.js';
 
 export function bindMenu() {
   const applySubtitle = () => {
@@ -75,16 +78,34 @@ export function bindMenu() {
   bindLibrary({
     onPlay: (track) => { selectAndPlay(track, { bot: false }); },
     onBot:  (track) => { selectAndPlay(track, { bot: true  }); },
+    onSelect: (track) => { setCurrentTrack(track); updatePlayButton(); },
   });
 
-  document.getElementById('playBtn').addEventListener('click', startGameSequence);
+  document.getElementById('playBtn').addEventListener('click', () => {
+    state.botMode = false;
+    startGameSequence();
+  });
+  document.getElementById('demoBtn')?.addEventListener('click', loadDemoAndPlay);
   document.getElementById('againBtn').addEventListener('click', async () => {
-    // Fully unwind current playback state before returning to menu.
-    // Without this, an old sourceNode could still be playing and the
-    // results screen might reappear after the user changes mode.
+    if (!state.audioBuffer || !state.notes.length) return;
+    const { restartCurrent } = await import('../game/loop.js');
+    await restartCurrent();
+  });
+  document.getElementById('resultMenuBtn')?.addEventListener('click', async () => {
     const { exitToMenu } = await import('../game/loop.js');
     await exitToMenu();
     updatePlayButton();
+  });
+  window.addEventListener('keydown', e => {
+    const result = document.getElementById('result');
+    if (!result || result.style.display !== 'flex') return;
+    if (e.repeat) return;
+    if (e.code === 'KeyR' || e.code === 'Enter' || e.code === 'Space') {
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      document.getElementById('againBtn')?.click();
+    }
   });
 }
 
@@ -150,13 +171,20 @@ async function handleFiles(files) {
   renderLibrary();
 }
 
-function setCurrentTrack(track) {
+export function setCurrentTrack(track) {
   state.currentTrackId = track.id;
   state.fileName = track.name;
   state.audioBuffer = track.audioBuffer;
   state.fileBytes = track.fileBytes;
   state.fileHash = track.fileHash || '';
   renderLibrary();
+}
+
+export function afterLibraryRestored(tracks) {
+  if (tracks && tracks.length) {
+    setCurrentTrack(tracks[tracks.length - 1]);
+    updatePlayButton();
+  }
 }
 
 // Called from library card "Play" / "Bot" buttons
@@ -325,19 +353,76 @@ async function startGameSequence() {
     if (overlayBar) overlayBar.style.width = '100%';
     if (overlayPct) overlayPct.textContent = '100%';
     if (overlayStage) overlayStage.textContent = t('menu.analysisReady');
+    const delay = analysis.fromCache ? 60 : 280;
     setTimeout(() => {
       topNote.style.display = 'none';
       if (overlay) overlay.classList.remove('active');
-      startPlay();
       analyzing = false;
-    }, 620);
+      updatePlayButton();
+      applyKeyLabels();
+      showPreview({ bot: state.botMode });
+    }, delay);
   } catch (e) {
     console.error(e);
-    alert(t('common.error') + ': ' + e);
+    notice(t('common.error') + ': ' + e, 4200);
     btn.disabled = false;
     updatePlayButton();
     document.getElementById('topNote').style.display = 'none';
     if (overlay) overlay.classList.remove('active');
     analyzing = false;
+  }
+}
+
+async function loadDemoAndPlay() {
+  if (analyzing) return;
+  if (!state.audioCtx) state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (state.audioCtx.state === 'suspended') await state.audioCtx.resume();
+  const existing = listTracks().find(tr => tr.isDemo);
+  if (existing) {
+    setCurrentTrack(existing);
+    document.getElementById('trackName').textContent = t('menu.fileReady', {
+      name: t('menu.demoName'),
+      duration: existing.duration.toFixed(1),
+      sr: (existing.sampleRate / 1000).toFixed(0),
+    });
+    updatePlayButton();
+    state.botMode = false;
+    await startGameSequence();
+    return;
+  }
+  const btn = document.getElementById('demoBtn');
+  if (btn) { btn.disabled = true; btn.textContent = t('menu.demoLoading'); }
+  try {
+    const demo = buildDemoTrack(state.audioCtx);
+    let fileHash = '';
+    try {
+      const { sha1 } = await import('../audio/cache.js');
+      fileHash = await sha1(demo.fileBytes);
+    } catch { /* ignore */ }
+    const id = addTrack({
+      name: t('menu.demoName'),
+      size: demo.fileBytes.byteLength,
+      duration: demo.duration,
+      sampleRate: demo.sampleRate,
+      audioBuffer: demo.audioBuffer,
+      fileBytes: demo.fileBytes,
+      fileHash,
+      isDemo: true,
+    });
+    setCurrentTrack(getTrack(id));
+    document.getElementById('trackName').textContent = t('menu.fileReady', {
+      name: t('menu.demoName'),
+      duration: demo.duration.toFixed(1),
+      sr: (demo.sampleRate / 1000).toFixed(0),
+    });
+    updatePlayButton();
+    renderLibrary();
+    state.botMode = false;
+    await startGameSequence();
+  } catch (e) {
+    console.error(e);
+    notice(t('common.error') + ': ' + e, 4200);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = t('menu.demoBtn'); }
   }
 }
