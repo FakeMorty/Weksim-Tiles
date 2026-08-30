@@ -114,6 +114,7 @@ export function detectHolds(onsets, envelopes, framesPerSec,
   const vocalMedian = ([...eVocalSmooth].sort((a, b) => a - b))[eVocalSmooth.length >> 1] || 1e-6;
 
   const holdProbBase = (holdBias === 2 ? 0.55 : holdBias === 1 ? 0.35 : 0) * params.probMul;
+  const rand = typeof opts.rng === 'function' ? opts.rng : Math.random;
 
   const events = [];
   const timeToFrame = (t) => Math.min(numFrames - 1, Math.max(0, Math.floor(t * framesPerSec)));
@@ -157,8 +158,8 @@ export function detectHolds(onsets, envelopes, framesPerSec,
       const strongSustain = energyRatio >= 1.4;    // clearly a hold
       const borderline = energyRatio >= 0.85;      // maybe a hold
       const shouldProbe = strongSustain
-        || (borderline && Math.random() < holdProbBase * 1.5)
-        || Math.random() < holdProbBase;
+        || (borderline && rand() < holdProbBase * 1.5)
+        || rand() < holdProbBase;
 
       if (shouldProbe && eSmooth[f0] > LOW_THR) {
         // Follow the envelope with hysteresis until it drops below LOW_THR

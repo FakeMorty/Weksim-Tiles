@@ -76,7 +76,11 @@ globalThis.localStorage = {
   setItem(k, v) { this._s[k] = String(v); },
   removeItem(k) { delete this._s[k]; },
 };
-globalThis.navigator = globalThis.navigator || { userAgent: 'Node', language: 'en', languages: ['en'] };
+try {
+  globalThis.navigator = globalThis.navigator || { userAgent: 'Node', language: 'en', languages: ['en'] };
+} catch {
+  /* Node 22+ navigator is a getter-only global */
+}
 if (!globalThis.crypto || !globalThis.crypto.subtle) {
   try { Object.defineProperty(globalThis, 'crypto', { value: { subtle: { digest: () => Promise.resolve(new ArrayBuffer(20)) } }, configurable: true }); }
   catch { /* modern node already has one */ }
@@ -84,6 +88,13 @@ if (!globalThis.crypto || !globalThis.crypto.subtle) {
 
 const modules = [
   'src/config.js',
+  'src/utils/rng.js',
+  'src/game/keys.js',
+  'src/game/accuracy.js',
+  'src/game/health.js',
+  'src/audio/demoTrack.js',
+  'src/ui/preview.js',
+  'src/ui/settings.js',
   'src/i18n/locales/en.js',
   'src/i18n/locales/ru.js',
   'src/i18n/locales/de.js',

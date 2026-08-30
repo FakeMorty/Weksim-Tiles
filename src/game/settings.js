@@ -1,5 +1,4 @@
-// Persistent user settings (volume, FX quality). Separate from calibration.js
-// so that things which change per-play don't touch calibration data.
+// Persistent user settings (volume, FX quality, gameplay prefs, keybinds).
 
 const LS_KEY = 'wt.settings.v1';
 const MIGRATION_FLAG = 'wt.settings.migrated.v124'; // one-shot Etap E migration
@@ -18,13 +17,31 @@ const DEFAULTS = {
   // Etap E (v1.24)
   warmup: true,          // 4-beat count-in metronome before track starts
   warmupBeats: 4,        // number of count-in beats (2..8)
-  hitSound: 'click',     // 'off' | 'click' | 'kick' | 'snare' | 'custom' — on by default (Etap E v1.24.1)
+  hitSound: 'click',     // 'off' | 'click' | 'kick' | 'snare' | 'custom'
   hitSoundVolume: 0.5,   // 0..1
   hitSoundCustomB64: '', // base64-encoded custom sample (data-URL body)
-  botHitSound: 'click',  // separate hit sound for bot playback ('off' | 'click' | 'kick' | 'snare' | 'custom')
+  botHitSound: 'click',  // separate hit sound for bot playback
+  // v1.25 gameplay prefs (used to live only in the DOM)
+  mode: 'drums',
+  difficulty: 'normal',
+  sens: 1.25,
+  fallTime: 1.45,
+  bpmAuto: true,
+  beatsLead: 2.0,
+  holdAmt: 1,
+  holdEnable: true,
+  dual: true,
+  smartLane: true,
+  noFail: false,
+  laneKeys: ['KeyD', 'KeyF', 'KeyJ', 'KeyK'],
 };
 
-export const settings = { ...DEFAULTS };
+export const settings = { ...DEFAULTS, laneKeys: [...DEFAULTS.laneKeys] };
+
+function clampLaneKeys(v) {
+  if (!Array.isArray(v) || v.length !== 4) return [...DEFAULTS.laneKeys];
+  return v.map((c, i) => (typeof c === 'string' && c) ? c : DEFAULTS.laneKeys[i]);
+}
 
 export function loadSettings() {
   try {
@@ -47,6 +64,18 @@ export function loadSettings() {
     if (typeof obj.hitSoundVolume === 'number') settings.hitSoundVolume = Math.max(0, Math.min(1, obj.hitSoundVolume));
     if (typeof obj.hitSoundCustomB64 === 'string') settings.hitSoundCustomB64 = obj.hitSoundCustomB64;
     if (typeof obj.botHitSound === 'string') settings.botHitSound = obj.botHitSound;
+    if (typeof obj.mode === 'string') settings.mode = obj.mode;
+    if (typeof obj.difficulty === 'string') settings.difficulty = obj.difficulty;
+    if (typeof obj.sens === 'number') settings.sens = Math.max(0.5, Math.min(2.5, obj.sens));
+    if (typeof obj.fallTime === 'number') settings.fallTime = Math.max(0.85, Math.min(2.4, obj.fallTime));
+    if (typeof obj.bpmAuto === 'boolean') settings.bpmAuto = obj.bpmAuto;
+    if (typeof obj.beatsLead === 'number') settings.beatsLead = obj.beatsLead;
+    if (typeof obj.holdAmt === 'number') settings.holdAmt = obj.holdAmt|0;
+    if (typeof obj.holdEnable === 'boolean') settings.holdEnable = obj.holdEnable;
+    if (typeof obj.dual === 'boolean') settings.dual = obj.dual;
+    if (typeof obj.smartLane === 'boolean') settings.smartLane = obj.smartLane;
+    if (typeof obj.noFail === 'boolean') settings.noFail = obj.noFail;
+    if (obj.laneKeys) settings.laneKeys = clampLaneKeys(obj.laneKeys);
 
     // v1.24.1: one-shot migration — users of v1.24.0 got hitSound='off' by
     // default; nobody would think to turn it on. Force it back to 'click'
@@ -81,6 +110,18 @@ export function saveSettings() {
       hitSoundVolume: settings.hitSoundVolume,
       hitSoundCustomB64: settings.hitSoundCustomB64,
       botHitSound: settings.botHitSound,
+      mode: settings.mode,
+      difficulty: settings.difficulty,
+      sens: settings.sens,
+      fallTime: settings.fallTime,
+      bpmAuto: settings.bpmAuto,
+      beatsLead: settings.beatsLead,
+      holdAmt: settings.holdAmt,
+      holdEnable: settings.holdEnable,
+      dual: settings.dual,
+      smartLane: settings.smartLane,
+      noFail: settings.noFail,
+      laneKeys: settings.laneKeys,
     }));
   } catch { /* ignore */ }
 }

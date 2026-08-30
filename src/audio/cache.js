@@ -11,13 +11,19 @@
 // a different difficulty or after tweaking calibration.
 
 const DB_NAME = 'weksim-tiles';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = 'analysis';
+const LIB_STORE = 'library';
 
 let dbPromise = null;
 
+function idbAvailable() {
+  return typeof indexedDB !== 'undefined';
+}
+
 function openDb() {
   if (dbPromise) return dbPromise;
+  if (!idbAvailable()) return Promise.reject(new Error('no indexedDB'));
   dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
@@ -25,6 +31,9 @@ function openDb() {
       if (!db.objectStoreNames.contains(STORE)) {
         const s = db.createObjectStore(STORE, { keyPath: 'key' });
         s.createIndex('createdAt', 'createdAt', { unique: false });
+      }
+      if (!db.objectStoreNames.contains(LIB_STORE)) {
+        db.createObjectStore(LIB_STORE, { keyPath: 'id' });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -147,4 +156,95 @@ export async function clearCache() {
     console.warn('cache clear failed:', e);
     return false;
   }
+}
+
+const MAX_PERSISTED_TRACKS = 12;
+const MAX_PERSIST_BYTES = 40 * 1024 * 1024;
+
+export async function putLibraryTrack(track) {
+  if (!idbAvailable()) return;
+  if (!track || track.isDemo) return;
+  if (!track.fileBytes || track.fileBytes.byteLength > MAX_PERSIST_BYTES) return;
+  try {
+    const db = await openDb();
+    const record = {
+      id: track.id,
+      name: track.name,
+      size: track.size,
+      duration: track.duration,
+      sampleRate: track.sampleRate,
+      fileHash: track.fileHash || '',
+      fileBytes: track.fileBytes,
+      bpm: track.bpm || 0,
+      difficulty: track.difficulty || 0,
+      genre: track.genre || '',
+      addedAt: track.addedAt || Date.now(),
+    };
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(LIB_STORE, 'readwrite');
+      const store = tx.objectStore(LIB_STORE);
+      const req = store.put(record);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+    await trimLibraryStore();
+  } catch (e) {
+    console.warn('library persist failed:', e);
+  }
+}
+
+export async function deleteLibraryTrack(id) {
+  if (!idbAvailable()) return;
+  try {
+    const db = await openDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(LIB_STORE, 'readwrite');
+      const req = tx.objectStore(LIB_STORE).delete(id);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) {
+    console.warn('library delete failed:', e);
+  }
+}
+
+export async function listLibraryTracks() {
+  if (!idbAvailable()) return [];
+  try {
+    const db = await openDb();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(LIB_STORE, 'readonly');
+      const req = tx.objectStore(LIB_STORE).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) {
+    console.warn('library list failed:', e);
+    return [];
+  }
+}
+
+export async function clearLibraryStore() {
+  if (!idbAvailable()) return;
+  try {
+    const db = await openDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(LIB_STORE, 'readwrite');
+      const req = tx.objectStore(LIB_STORE).clear();
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) {
+    console.warn('library clear failed:', e);
+  }
+}
+
+async function trimLibraryStore() {
+  try {
+    const rows = await listLibraryTracks();
+    if (rows.length <= MAX_PERSISTED_TRACKS) return;
+    rows.sort((a, b) => (a.addedAt || 0) - (b.addedAt || 0));
+    const drop = rows.length - MAX_PERSISTED_TRACKS;
+    for (let i = 0; i < drop; i++) await deleteLibraryTrack(rows[i].id);
+  } catch { /* ignore */ }
 }

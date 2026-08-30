@@ -22,7 +22,13 @@
 //      simple patterns, NORMAL adds trills and stairs, HARD adds jumps
 //      and jack, EXPERT unlocks chord doubles and rapid direction changes.
 
+import { mulberry32 } from '../utils/rng.js';
+
 const LANES = 4;
+
+// Swapped for a seeded PRNG at the start of generateMap so charts are
+// deterministic for a given track + settings.
+let rand = Math.random;
 
 // Band indices from src/audio/spectralFlux.js — kept in sync there.
 // [0] sub-bass 20-60Hz, [1] bass 60-250Hz, [2] low-mid 250-500Hz,
@@ -85,17 +91,17 @@ const PATTERNS = {
     const out = [];
     let lane = startLane;
     let dir = 1;
-    let untilBreak = 6 + Math.floor(Math.random() * 5); // 6..10
+    let untilBreak = 6 + Math.floor(rand() * 5); // 6..10
     for (let i = 0; i < run.length; i++) {
       out.push({ lane, event: run[i] });
       untilBreak--;
       if (untilBreak <= 0) {
         // Jump ±2 or ±3
-        const jumpAbs = Math.random() < 0.6 ? 2 : 3;
-        const jumpDir = Math.random() < 0.5 ? 1 : -1;
+        const jumpAbs = rand() < 0.6 ? 2 : 3;
+        const jumpDir = rand() < 0.5 ? 1 : -1;
         lane = ((lane + jumpAbs * jumpDir) % LANES + LANES) % LANES;
         dir = -dir; // flip direction after jump
-        untilBreak = 6 + Math.floor(Math.random() * 5);
+        untilBreak = 6 + Math.floor(rand() * 5);
       } else {
         // Regular ±1 step, bounce off edges
         const nextLane = lane + dir;
@@ -120,6 +126,9 @@ export function generateMap(events, beatTimes, bpm, opts) {
   const difficulty = opts.difficulty || 'normal';
   const downbeatIndices = opts.downbeatIndices || [];
   const downbeatConfidence = opts.downbeatConfidence || 0;
+  rand = typeof opts.rng === 'function'
+    ? opts.rng
+    : mulberry32((opts.seed >>> 0) || 1);
 
   // Classify each onset. Etap C (v1.22): if source separation gave us a
   // direct tag (kick/snare/hihat/melody), trust it — it's far more accurate
@@ -179,7 +188,7 @@ export function generateMap(events, beatTimes, bpm, opts) {
       for (const ev of run) {
         if (!ev.isDownbeat || ev.strength < 0.55) continue;
         if (ev.time - lastChordTime < 0.6) continue;
-        if (Math.random() > chordProb * 1.4) continue;
+        if (rand() > chordProb * 1.4) continue;
         const placed = rawNotes.find(n => Math.abs(n.time - ev.time) < 0.010);
         if (!placed) continue;
         const twinLane = (placed.lane + 2) % LANES;
@@ -252,7 +261,7 @@ function routeByMusicalRole(run, seedLastLane, difficulty) {
         if (next < 0 || next >= LANES) { hihatDir = -hihatDir; next = lastHihatLane + hihatDir; }
         // Every 8-12 hi-hats jump ±2 for variety, more often on EXPERT
         const jumpProb = difficulty === 'expert' ? 0.12 : 0.07;
-        if (Math.random() < jumpProb) {
+        if (rand() < jumpProb) {
           next = ((lastHihatLane + (hihatDir * 2)) % LANES + LANES) % LANES;
           hihatDir = -hihatDir;
         }
@@ -454,25 +463,25 @@ function pickPattern(run, difficulty, chordProb) {
   const anyDownbeat = run.some(e => e.isDownbeat);
   const strongestStrength = run.reduce((m, e) => Math.max(m, e.strength), 0);
 
-  if (len === 1 && anyDownbeat && strongestStrength > 0.6 && Math.random() < chordProb) {
+  if (len === 1 && anyDownbeat && strongestStrength > 0.6 && rand() < chordProb) {
     return 'chord';
   }
   if (len === 1) return 'stair';
 
   if (len <= 3) {
-    if (difficulty === 'expert' && Math.random() < 0.3) return 'trill';
+    if (difficulty === 'expert' && rand() < 0.3) return 'trill';
     return 'stair';
   }
 
   if (len <= 8) {
     const gapAvg = (run[run.length - 1].time - run[0].time) / (len - 1);
-    if (difficulty === 'expert' && gapAvg < 0.16 && Math.random() < 0.15) {
+    if (difficulty === 'expert' && gapAvg < 0.16 && rand() < 0.15) {
       return 'jack';
     }
     // v1.19: rotate through several stream variants instead of pinning to 'stream'
     const options = ['stream', 'stair', 'stairDown', 'brokenStream'];
     if (difficulty === 'hard' || difficulty === 'expert') options.push('trill', 'brokenStream');
-    return options[Math.floor(Math.random() * options.length)];
+    return options[Math.floor(rand() * options.length)];
   }
 
   // v1.19: long runs (9+) — use brokenStream to inject jumps, not the
@@ -480,21 +489,21 @@ function pickPattern(run, difficulty, chordProb) {
   const longOptions = difficulty === 'easy'
     ? ['stream', 'stair']
     : ['brokenStream', 'brokenStream', 'stream', 'stairDown']; // 2x weight
-  return longOptions[Math.floor(Math.random() * longOptions.length)];
+  return longOptions[Math.floor(rand() * longOptions.length)];
 }
 
 function pickStartLane(lastLane, run, pattern) {
   const first = run[0];
   let candidate;
   if (pattern === 'jack') {
-    candidate = 1 + Math.floor(Math.random() * 2);
+    candidate = 1 + Math.floor(rand() * 2);
   } else if (first.isDownbeat) {
-    candidate = Math.random() < 0.5 ? 0 : 3;
+    candidate = rand() < 0.5 ? 0 : 3;
   } else {
-    candidate = Math.floor(Math.random() * LANES);
+    candidate = Math.floor(rand() * LANES);
   }
   if (candidate === lastLane && pattern !== 'jack') {
-    candidate = (candidate + 1 + Math.floor(Math.random() * (LANES - 1))) % LANES;
+    candidate = (candidate + 1 + Math.floor(rand() * (LANES - 1))) % LANES;
   }
   return candidate;
 }

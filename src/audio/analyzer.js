@@ -7,6 +7,7 @@ import { limitDensity, DIFFICULTY_PRESETS } from './density.js';
 import { generateMap } from './mapgen.js';
 import { detectHolds } from './holds.js';
 import { sha1, buildKey, getCached, putCached } from './cache.js';
+import { mulberry32, seedFromString } from '../utils/rng.js';
 
 let worker = null;
 function getWorker() {
@@ -43,9 +44,11 @@ export async function analyzeTrack(audioBuffer, modeStr, sens, opts) {
   // a fully-baked map for this (file × mode × difficulty × sens × ...).
   // Cache hits complete in ~10 ms instead of 5-8 s.
   let cacheKey = null;
+  let fileHash = opts.fileHash || '';
   if (opts.fileBytes) {
     try {
       const hash = await sha1(opts.fileBytes);
+      fileHash = fileHash || hash;
       cacheKey = buildKey(hash, {
         mode: modeStr,
         difficulty: opts.difficulty || 'normal',
@@ -71,6 +74,11 @@ export async function analyzeTrack(audioBuffer, modeStr, sens, opts) {
       console.warn('cache lookup failed, proceeding with fresh analysis:', e);
     }
   }
+
+  const seed = seedFromString(
+    fileHash + '|' + modeStr + '|' + (opts.difficulty || 'normal') + '|' + sens
+  );
+  const rng = mulberry32(seed);
 
   const mono = downmix(audioBuffer);
   const w = getWorker();
@@ -104,7 +112,7 @@ export async function analyzeTrack(audioBuffer, modeStr, sens, opts) {
   });
 
   // Build note events from onsets + HOLD detection (uses novelty as sustain proxy)
-  let events = buildEvents(result, audioBuffer.duration, modeStr, opts);
+  let events = buildEvents(result, audioBuffer.duration, modeStr, { ...opts, rng });
 
   // Etap 6 (density cap): trim overly-dense sections down to a playable rate.
   // Difficulty preset controls the ceiling. HOLD notes are protected.
@@ -125,6 +133,8 @@ export async function analyzeTrack(audioBuffer, modeStr, sens, opts) {
       difficulty: opts.difficulty || 'normal',
       downbeatIndices: result.downbeatIndices || [],
       downbeatConfidence: result.downbeatConfidence || 0,
+      seed,
+      rng,
     }
   );
 
@@ -192,6 +202,7 @@ function buildEvents(res, duration, modeStr, opts) {
         holdEnable: opts.holdEnable,
         holdMode: opts.holdMode,
         pitchRegions: pitchRegions || [],
+        rng: opts.rng,
       }
     );
   }
@@ -208,7 +219,8 @@ function buildEvents(res, duration, modeStr, opts) {
   const events = [];
   for (const o of onsets) {
     let holdDur = 0;
-    if (opts.holdEnable && params.prob > 0 && Math.random() < params.prob) {
+    const rand = typeof opts.rng === 'function' ? opts.rng : Math.random;
+    if (opts.holdEnable && params.prob > 0 && rand() < params.prob) {
       const f0 = Math.floor(o.time * framesPerSec);
       const maxF = Math.floor(params.maxH * framesPerSec);
       let cnt = 0, below = 0;

@@ -3,16 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self' data: blob:;">
-<title>RHYTHM SHOOTER // neon tiles v1.5 STFT</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self' data: blob:;">
+<title>RHYTHM SHOOTER // neon tiles v1.25</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Orbitron:wght@600;800&display=swap');
   *{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-user-select:none;}
-  html,body{height:100%;background:#05060d;color:#cfefff;font-family:'JetBrains Mono',monospace;overflow:hidden;}
+  html,body{height:100%;background:#05060d;color:#cfefff;font-family:ui-monospace,'Cascadia Mono','Segoe UI Mono','SF Mono',Consolas,monospace;overflow:hidden;}
   canvas{display:block;width:100vw;height:100vh;background: radial-gradient(1200px 800px at 50% -10%, #0f1430 0%, #05060d 55%, #03040a 100%);}
-  #menu, #result{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(3,5,12,0.92);backdrop-filter:blur(10px);z-index:10;transition:opacity .3s;}
+  #menu, #result, #settingsScreen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;background:rgba(3,5,12,0.92);backdrop-filter:blur(10px);z-index:10;transition:opacity .3s;overflow-y:auto;overflow-x:hidden;padding:28px 12px 48px;-webkit-overflow-scrolling:touch;}
+  @media(min-height:920px){#menu,#result,#settingsScreen{justify-content:center;}}
   #result{display:none;}
-  h1{font-family:'Orbitron',sans-serif;font-weight:800;letter-spacing:.08em;font-size: clamp(28px,5vw,52px);color:#7efaff;text-shadow:0 0 18px #00e5ff88, 0 0 42px #6a00ff44;margin-bottom:8px;}
+  h1{font-family:system-ui,'Segoe UI','Helvetica Neue',sans-serif;font-weight:800;letter-spacing:.12em;font-size: clamp(28px,5vw,52px);color:#7efaff;text-shadow:0 0 18px #00e5ff88, 0 0 42px #6a00ff44;margin-bottom:8px;text-transform:uppercase;}
   .subtitle{color:#7aa3b8;font-size:13px;margin-bottom:26px;letter-spacing:.12em;text-transform:uppercase;}
   .panel{width:min(760px,95vw); background: linear-gradient(180deg,#0b1124aa,#070a18cc);border:1px solid #1d2a4a; border-radius:18px; padding:24px 24px 20px; box-shadow:0 0 40px #0066ff18 inset, 0 10px 50px #0008;}
   .dropzone{border:1.8px dashed #2a4a7a; border-radius:14px; padding:28px 18px; text-align:center; cursor:pointer;transition:.2s; color:#88b8d8; background:#0a1230aa;}
@@ -20,14 +20,14 @@
   .lib-card{display:flex; align-items:center; gap:12px; padding:10px 12px; background:linear-gradient(180deg,#0b1330,#0a1024); border:1px solid #1c2c50; border-radius:12px; transition:.12s;}
   .lib-card:hover{border-color:#2c5088; background:linear-gradient(180deg,#0e1740,#0a112b);}
   .lib-card.selected{border-color:#00d0ff; background:linear-gradient(180deg,#0e2248,#0a1738); box-shadow:0 0 14px #00e5ff22 inset;}
-  .lib-num{font-family:'Orbitron',sans-serif; font-weight:800; color:#7efaff; font-size:18px; width:24px; text-align:center; opacity:.7;}
+  .lib-num{font-family:system-ui,'Segoe UI',sans-serif; font-weight:800; color:#7efaff; font-size:18px; width:24px; text-align:center; opacity:.7;}
   .lib-info{flex:1; min-width:0;}
   .lib-title{font-weight:700; color:#eaffff; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .lib-sub{font-size:10px; color:#6a8fb0; margin-top:2px; letter-spacing:.06em;}
   .lib-stars{color:#ffd93d; font-size:12px; letter-spacing:2px; text-shadow:0 0 8px #ffb63344;}
   .lib-stars .off{color:#2a3450; text-shadow:none;}
   .lib-actions{display:flex; gap:6px;}
-  .lib-btn{padding:7px 14px; border-radius:8px; font-family:'Orbitron',sans-serif; font-weight:600; font-size:11px; border:none; cursor:pointer; letter-spacing:.08em; text-transform:uppercase; transition:.12s;}
+  .lib-btn{padding:7px 14px; border-radius:8px; font-family:system-ui,'Segoe UI',sans-serif; font-weight:600; font-size:11px; border:none; cursor:pointer; letter-spacing:.08em; text-transform:uppercase; transition:.12s;}
   .lib-btn.play{background:linear-gradient(90deg,#00d9ff,#7b61ff); color:#02121a;}
   .lib-btn.play:hover{filter:brightness(1.1);}
   .lib-btn.bot{background:#1a2645; color:#9ecae8; border:1px solid #2a4c7a;}
@@ -39,7 +39,7 @@
   #fileInput{display:none}
   .row{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px;align-items:center}
   .modes{display:flex;gap:10px;flex-wrap:wrap}
-  .mode-btn{flex:1; min-width:150px; padding:12px 14px; border-radius:12px; border:1px solid #2a3c66; background:#0d1630;color:#9ecae8; font-family:'JetBrains Mono',monospace; font-weight:700; cursor:pointer; letter-spacing:.04em;transition:.15s; text-transform:uppercase; font-size:13px;}
+  .mode-btn{flex:1; min-width:150px; padding:12px 14px; border-radius:12px; border:1px solid #2a3c66; background:#0d1630;color:#9ecae8; font-family:ui-monospace,'Cascadia Mono',Consolas,monospace; font-weight:700; cursor:pointer; letter-spacing:.04em;transition:.15s; text-transform:uppercase; font-size:13px;}
   .mode-btn.active{border-color:#00f6ff; color:#dfffff; background:#0e2248; box-shadow:0 0 18px #00e5ff33, inset 0 0 16px #00bfff18; text-shadow:0 0 8px #6cf;}
   .mode-btn small{display:block; font-weight:400; color:#6d9ab6; font-size:11px; margin-top:3px; text-transform:none}
   .mode-btn.active small{color:#9eeaff}
@@ -48,13 +48,15 @@
   @media(max-width:520px){.sliders{grid-template-columns:1fr}}
   .slider-box{background:#0a1126; border:1px solid #1b2a4d; border-radius:12px; padding:12px 14px}
   .slider-box label{font-size:11px; color:#6a8fb0; text-transform:uppercase; letter-spacing:.08em; display:flex; justify-content:space-between}
-  .slider-box input, .slider-box select{width:100%; margin-top:8px; accent-color:#00e5ff; background:#08132a; color:#bfefff; border:1px solid #1d3358; border-radius:8px; padding:6px; font-family:'JetBrains Mono',monospace}
+  .slider-box input, .slider-box select{width:100%; margin-top:8px; accent-color:#00e5ff; background:#08132a; color:#bfefff; border:1px solid #1d3358; border-radius:8px; padding:6px; font-family:ui-monospace,'Cascadia Mono',Consolas,monospace}
   .slider-box input:disabled{opacity:.45}
   .toggle-row{display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; font-size:12px; color:#7aa9c6; align-items:center}
   .toggle-row label{display:flex; align-items:center; gap:7px; cursor:pointer}
   .toggle-row input, .toggle-row select{accent-color:#00e5ff}
-  .toggle-row select{background:#0a1a34; color:#bfefff; border:1px solid #254567; border-radius:7px; padding:4px 8px; font-family:'JetBrains Mono',monospace; font-size:12px}
-  .play-btn{width:100%; margin-top:18px; padding:16px; font-size:16px; font-weight:700; letter-spacing:.08em;border:none; border-radius:14px; cursor:pointer; color:#02121a; text-transform:uppercase;background:linear-gradient(90deg,#00f0ff,#7b61ff); box-shadow:0 0 26px #00d9ff55, 0 6px 24px #000a;font-family:'Orbitron',sans-serif; transition:.15s;}
+  .toggle-row select{background:#0a1a34; color:#bfefff; border:1px solid #254567; border-radius:7px; padding:4px 8px; font-family:ui-monospace,'Cascadia Mono',Consolas,monospace; font-size:12px}
+  .play-btn{width:100%; margin-top:18px; padding:16px; font-size:16px; font-weight:700; letter-spacing:.08em;border:none; border-radius:14px; cursor:pointer; color:#02121a; text-transform:uppercase;background:linear-gradient(90deg,#00f0ff,#7b61ff); box-shadow:0 0 26px #00d9ff55, 0 6px 24px #000a;font-family:system-ui,'Segoe UI',sans-serif; transition:.15s;}
+  .play-btn.secondary{background:transparent;color:#bfefff;border:1px solid #2a3c66;box-shadow:none;margin-top:8px;}
+  .play-btn.secondary:hover{border-color:#51f0ff;background:#0e2248;}
   .play-btn:hover{filter:brightness(1.08); transform:translateY(-1px)}
   .play-btn:disabled{opacity:.45; cursor:not-allowed; filter:grayscale(.4)}
   .hint{font-size:12px; color:#5e8099; margin-top:12px; line-height:1.55}
@@ -63,36 +65,36 @@
   #hud{position:absolute;top:0;left:0;right:0;pointer-events:none;z-index:5;padding:14px 18px;display:none;justify-content:space-between;align-items:flex-start}
   #hudLeft,#hudRight{display:flex;flex-direction:column;gap:6px}
   .hud-pill{background:#061124cc; border:1px solid #1a3458; border-radius:10px; padding:7px 12px; font-size:13px; color:#aee9ff; backdrop-filter:blur(6px)}
-  .hud-big{font-family:'Orbitron',sans-serif; font-size:22px; color:#eaffff; text-shadow:0 0 10px #00eaffaa}
-  #comboText{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-family:'Orbitron',sans-serif;font-size: clamp(26px,5vw,44px);color:#fff; text-shadow:0 0 18px #ff39e8, 0 0 40px #00f0ff66; opacity:0; transition:opacity .12s; pointer-events:none; z-index:4}
+  .hud-big{font-family:system-ui,'Segoe UI',sans-serif; font-size:22px; color:#eaffff; text-shadow:0 0 10px #00eaffaa}
+  #comboText{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-family:system-ui,'Segoe UI',sans-serif;font-size: clamp(26px,5vw,44px);color:#fff; text-shadow:0 0 18px #ff39e8, 0 0 40px #00f0ff66; opacity:0; transition:opacity .12s; pointer-events:none; z-index:4}
   #judgeText{position:absolute;left:50%;top:47%;transform:translate(-50%,-50%);font-weight:700;font-size:18px;letter-spacing:.16em;text-transform:uppercase;opacity:0;transition:.12s;pointer-events:none;z-index:4;text-shadow:0 0 12px currentColor}
   #topNote{position:absolute;top:14px;left:50%;transform:translateX(-50%);font-size:11px;letter-spacing:.14em;color:#5f8aa8;z-index:6;display:none;text-transform:uppercase; text-align:center; max-width:90vw}
   /* Analysis overlay (Etap E v1.24.1) — large, unmissable */
   #analysisOverlay{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(3,5,12,0.88);backdrop-filter:blur(10px);z-index:20;}
   #analysisOverlay.active{display:flex;}
-  .anl-title{font-family:'Orbitron',sans-serif;font-weight:800;letter-spacing:.14em;font-size:22px;color:#7efaff;text-shadow:0 0 20px #00e5ff88;margin-bottom:6px;text-transform:uppercase;}
+  .anl-title{font-family:system-ui,'Segoe UI',sans-serif;font-weight:800;letter-spacing:.14em;font-size:22px;color:#7efaff;text-shadow:0 0 20px #00e5ff88;margin-bottom:6px;text-transform:uppercase;}
   .anl-track{color:#9ecae8;font-size:13px;margin-bottom:24px;max-width:80vw;text-align:center;word-break:break-all;}
   .anl-progress{width:min(520px,80vw);height:14px;background:#0a1230;border:1px solid #1e355a;border-radius:8px;overflow:hidden;box-shadow:0 0 22px #00e5ff22 inset;}
   .anl-progress i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#00f0ff,#7b61ff);box-shadow:0 0 12px #6ef;transition:width .12s;}
-  .anl-pct{margin-top:12px;font-family:'Orbitron',sans-serif;color:#eaffff;font-size:32px;letter-spacing:.06em;text-shadow:0 0 14px #00eaffaa;}
+  .anl-pct{margin-top:12px;font-family:system-ui,'Segoe UI',sans-serif;color:#eaffff;font-size:32px;letter-spacing:.06em;text-shadow:0 0 14px #00eaffaa;}
   .anl-stage{color:#5da6c8;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-top:6px;min-height:14px;}
   .anl-hint{color:#4a6d88;font-size:10px;letter-spacing:.1em;margin-top:22px;text-transform:uppercase;}
   #holdToast{position:absolute;left:50%;top:57%;transform:translateX(-50%);font-size:12px;letter-spacing:.14em;color:#ffc8ff;text-shadow:0 0 10px #ff66ff99;opacity:0;transition:.15s;pointer-events:none;z-index:4}
   #bpmBadge{position:absolute;top:14px;right:18px; font-size:11px; color:#6bcfe8; letter-spacing:.1em; z-index:6; display:none; background:#06172ecc; padding:6px 10px; border-radius:9px; border:1px solid #1d3a5a}
   /* bottom */
   #bottomBar{position:absolute;bottom:0;left:0;right:0;display:none;justify-content:center;gap:0;z-index:5;pointer-events:none}
-  .lane-key{width:25vw;max-width:170px;text-align:center;padding:11px 0 15px;font-family:'Orbitron',sans-serif;font-size:18px;color:#79d7ff;background:linear-gradient(180deg,transparent,#04132a55);border-top:1px solid #14315666;transition:.07s;position:relative}
+  .lane-key{width:25vw;max-width:170px;text-align:center;padding:11px 0 15px;font-family:system-ui,'Segoe UI',sans-serif;font-size:18px;color:#79d7ff;background:linear-gradient(180deg,transparent,#04132a55);border-top:1px solid #14315666;transition:.07s;position:relative}
   .lane-key.active{color:#fff;background:#00d0ff22; text-shadow:0 0 12px #6ef}
   .lane-key.holding{color:#fff; background:#b14bff22; border-top-color:#c774ff; text-shadow:0 0 14px #ff89ff}
   .lane-key .holdbar{position:absolute;left:18%;right:18%;bottom:6px;height:3px;background:#17385d;border-radius:2px;overflow:hidden}
   .lane-key .holdbar i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#6efaff,#d66fff);box-shadow:0 0 8px #8ef}
   /* result */
   .result-card{width:min(640px,92vw); text-align:center}
-  .result-score{font-family:'Orbitron',sans-serif; font-size:48px; color:#9effff; text-shadow:0 0 20px #00f0ff99; margin:10px 0}
+  .result-score{font-family:system-ui,'Segoe UI',sans-serif; font-size:48px; color:#9effff; text-shadow:0 0 20px #00f0ff99; margin:10px 0}
   .result-grid{display:grid;grid-template-columns:1fr 1fr 1fr; gap:10px; margin:18px 0; text-align:left}
   @media(max-width:560px){.result-grid{grid-template-columns:1fr 1fr}}
   .result-item{background:#0a1530; border:1px solid #1a2f52; border-radius:12px; padding:12px 14px; font-size:13px}
-  .result-item b{display:block; font-family:'Orbitron',sans-serif; font-size:20px; color:#eaffff; margin-top:3px}
+  .result-item b{display:block; font-family:system-ui,'Segoe UI',sans-serif; font-size:20px; color:#eaffff; margin-top:3px}
   .ghost{color:#5d819d; font-size:12px; margin-top:10px}
   #trackName{margin-top:10px; font-size:12px; color:#5da6c8; min-height:18px; word-break:break-all}
   .small-tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:#5a89a6}
@@ -101,7 +103,7 @@
   /* Calibration screen */
   #calibrationScreen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(3,5,12,0.94);backdrop-filter:blur(10px);z-index:11;}
   .cal-panel{width:min(680px,95vw);background:linear-gradient(180deg,#0b1124aa,#070a18cc);border:1px solid #1d2a4a;border-radius:18px;padding:26px;box-shadow:0 0 40px #0066ff18 inset,0 10px 50px #0008;}
-  .cal-title{font-family:'Orbitron',sans-serif;font-size:22px;color:#7efaff;letter-spacing:.08em;margin-bottom:6px;text-shadow:0 0 14px #00e5ff77;}
+  .cal-title{font-family:system-ui,'Segoe UI',sans-serif;font-size:22px;color:#7efaff;letter-spacing:.08em;margin-bottom:6px;text-shadow:0 0 14px #00e5ff77;}
   .cal-desc{color:#7aa3b8;font-size:12px;line-height:1.6;margin-bottom:16px}
   #calMetroBox{position:relative;width:180px;height:180px;margin:14px auto;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;}
   #calMetroRing{position:absolute;left:50%;top:50%;width:120px;height:120px;border-radius:50%;border:2px solid #7efaff;box-shadow:0 0 22px #00eaff88,inset 0 0 22px #00eaff33;transform:translate(-50%,-50%) scale(1);opacity:.5;transition:transform .09s,opacity .18s;}
@@ -112,7 +114,7 @@
   #calResult{text-align:center;color:#cfefff;font-size:13px;line-height:1.6;min-height:36px;margin:6px 0 12px;}
   #calSuggestedOffset{text-align:center;color:#5a89a6;font-size:11px;letter-spacing:.06em;margin-bottom:8px;}
   .cal-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
-  .cal-btn{flex:1;min-width:130px;padding:10px 12px;border:1px solid #2a3c66;background:#0d1630;color:#bfefff;border-radius:10px;font-family:'JetBrains Mono',monospace;font-weight:700;cursor:pointer;letter-spacing:.06em;font-size:12px;text-transform:uppercase;transition:.15s;}
+  .cal-btn{flex:1;min-width:130px;padding:10px 12px;border:1px solid #2a3c66;background:#0d1630;color:#bfefff;border-radius:10px;font-family:ui-monospace,'Cascadia Mono',Consolas,monospace;font-weight:700;cursor:pointer;letter-spacing:.06em;font-size:12px;text-transform:uppercase;transition:.15s;}
   .cal-btn:hover{border-color:#51f0ff;background:#0e2248;box-shadow:0 0 14px #00e5ff33;}
   .cal-btn:disabled{opacity:.4;cursor:not-allowed;}
   .cal-btn.primary{background:linear-gradient(90deg,#00f0ff,#7b61ff);color:#02121a;border-color:transparent;}
@@ -122,15 +124,15 @@
   .cal-slider-row label{flex:0 0 130px;color:#8ecae0;}
   .cal-slider-row input[type=range]{flex:1;accent-color:#00e5ff;}
   .cal-slider-row .val{flex:0 0 60px;text-align:right;color:#eaffff;font-weight:700;}
-  .cal-slider-row select{background:#0a1a34;color:#bfefff;border:1px solid #254567;border-radius:7px;padding:4px 8px;font-family:'JetBrains Mono',monospace;font-size:12px;}
-  #openCalibrationBtn{background:transparent;border:1px solid #2a3c66;color:#7aa9c6;padding:6px 12px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:.08em;text-transform:uppercase;transition:.15s;margin-top:10px;}
+  .cal-slider-row select{background:#0a1a34;color:#bfefff;border:1px solid #254567;border-radius:7px;padding:4px 8px;font-family:ui-monospace,'Cascadia Mono',Consolas,monospace;font-size:12px;}
+  #openCalibrationBtn{background:transparent;border:1px solid #2a3c66;color:#7aa9c6;padding:6px 12px;border-radius:8px;font-family:ui-monospace,'Cascadia Mono',Consolas,monospace;font-size:11px;cursor:pointer;letter-spacing:.08em;text-transform:uppercase;transition:.15s;margin-top:10px;}
   #openCalibrationBtn:hover{border-color:#51f0ff;color:#dfffff;box-shadow:0 0 12px #00e5ff33;}
   /* Pause screen */
   #pauseScreen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(3,5,12,0.82);backdrop-filter:blur(8px);z-index:12;}
   .pause-panel{width:min(420px,92vw);background:linear-gradient(180deg,#0b1124ee,#070a18ee);border:1px solid #1d2a4a;border-radius:18px;padding:28px 26px;box-shadow:0 0 40px #0066ff22 inset,0 10px 50px #000c;text-align:center;}
-  .pause-title{font-family:'Orbitron',sans-serif;font-size:26px;color:#7efaff;letter-spacing:.16em;margin-bottom:6px;text-shadow:0 0 16px #00e5ff88;}
+  .pause-title{font-family:system-ui,'Segoe UI',sans-serif;font-size:26px;color:#7efaff;letter-spacing:.16em;margin-bottom:6px;text-shadow:0 0 16px #00e5ff88;}
   .pause-sub{color:#7aa3b8;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:18px;}
-  .pause-btn{display:block;width:100%;padding:13px 16px;margin:8px 0;font-family:'Orbitron',sans-serif;font-size:14px;letter-spacing:.1em;text-transform:uppercase;border-radius:12px;border:1px solid #2a3c66;background:#0d1630;color:#bfefff;cursor:pointer;transition:.15s;}
+  .pause-btn{display:block;width:100%;padding:13px 16px;margin:8px 0;font-family:system-ui,'Segoe UI',sans-serif;font-size:14px;letter-spacing:.1em;text-transform:uppercase;border-radius:12px;border:1px solid #2a3c66;background:#0d1630;color:#bfefff;cursor:pointer;transition:.15s;}
   .pause-btn:hover{border-color:#51f0ff;background:#0e2248;color:#dfffff;box-shadow:0 0 18px #00e5ff33;}
   .pause-btn.primary{background:linear-gradient(90deg,#00f0ff,#7b61ff);color:#02121a;border-color:transparent;font-weight:700;}
   .pause-btn.danger{color:#ff9db0;border-color:#5a2434;}
@@ -141,26 +143,47 @@
   .pause-vol .val{font-weight:700;color:#eaffff;font-size:13px;min-width:44px;text-align:right;}
   .pause-hint{color:#5d819d;font-size:11px;margin-top:14px;letter-spacing:.06em;}
   /* Etap 10: stats + import buttons */
-  #openStatsBtn, #importMapBtn { background:transparent;border:1px solid #2a3c66;color:#7aa9c6;padding:6px 12px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:.08em;text-transform:uppercase;transition:.15s;margin-top:10px;}
+  #openStatsBtn, #importMapBtn { background:transparent;border:1px solid #2a3c66;color:#7aa9c6;padding:6px 12px;border-radius:8px;font-family:ui-monospace,'Cascadia Mono',Consolas,monospace;font-size:11px;cursor:pointer;letter-spacing:.08em;text-transform:uppercase;transition:.15s;margin-top:10px;}
   #openStatsBtn:hover, #importMapBtn:hover { border-color:#51f0ff;color:#dfffff;box-shadow:0 0 12px #00e5ff33;}
   #statsScreen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(3,5,12,0.94);backdrop-filter:blur(10px);z-index:11;padding:20px;}
   .stats-panel{width:min(760px,95vw);max-height:90vh;overflow-y:auto;background:linear-gradient(180deg,#0b1124aa,#070a18cc);border:1px solid #1d2a4a;border-radius:18px;padding:26px;}
-  .stats-panel h2{font-family:'Orbitron',sans-serif;color:#7efaff;font-size:22px;margin-bottom:14px;letter-spacing:.06em;}
+  .stats-panel h2{font-family:system-ui,'Segoe UI',sans-serif;color:#7efaff;font-size:22px;margin-bottom:14px;letter-spacing:.06em;}
   .stats-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
   .stats-summary .cell{background:#0a1530;border:1px solid #1a2f52;border-radius:12px;padding:12px;text-align:center;}
-  .stats-summary .cell b{display:block;font-family:'Orbitron',sans-serif;font-size:20px;color:#eaffff;margin-top:4px;}
+  .stats-summary .cell b{display:block;font-family:system-ui,'Segoe UI',sans-serif;font-size:20px;color:#eaffff;margin-top:4px;}
   .stats-summary .cell span{font-size:11px;color:#6a8fb0;letter-spacing:.08em;text-transform:uppercase;}
   .stats-list{display:flex;flex-direction:column;gap:6px;}
   .stats-row{display:grid;grid-template-columns:1.8fr 0.8fr 0.7fr 0.7fr 0.7fr 0.9fr;gap:8px;padding:8px 10px;background:#0a1530;border:1px solid #1a2f52;border-radius:8px;font-size:12px;align-items:center;}
   .stats-row.header{background:transparent;border:none;color:#6a8fb0;font-size:10px;text-transform:uppercase;letter-spacing:.08em;padding-bottom:2px;}
   .stats-row .name{color:#cfefff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .stats-row .num{color:#eaffff;font-family:'Orbitron',sans-serif;text-align:right;}
+  .stats-row .num{color:#eaffff;font-family:system-ui,'Segoe UI',sans-serif;text-align:right;}
   .stats-row .diff{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;text-align:center;letter-spacing:.05em;}
   .stats-empty{text-align:center;color:#5d819d;padding:40px 0;font-size:13px;}
+
+  #songProgress{position:absolute;top:0;left:0;right:0;height:4px;z-index:8;display:none;background:#06101ecc;}
+  #songProgress i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#00f0ff,#7b61ff);box-shadow:0 0 8px #00e5ff88;}
+  .hp-track{width:132px;height:8px;background:#0a1530;border:1px solid #1a3458;border-radius:6px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:8px;}
+  .hp-track i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#7aff99,#7dfffa);}
+  #openSettingsBtn{background:transparent;border:1px solid #2a3c66;color:#7aa9c6;padding:6px 12px;border-radius:8px;font-family:ui-monospace,'Cascadia Mono',Consolas,monospace;font-size:11px;cursor:pointer;letter-spacing:.08em;text-transform:uppercase;transition:.15s;margin-top:10px;}
+  #openSettingsBtn:hover{border-color:#51f0ff;color:#dfffff;box-shadow:0 0 12px #00e5ff33;}
+  #settingsScreen{display:none;}
+  .settings-section{margin-top:18px;}
+  .settings-section h3{font-size:11px;color:#6a8fb0;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;}
+  .keybind-row{display:flex;gap:10px;margin-top:10px;}
+  .keybind-btn{flex:1;padding:12px 8px;border-radius:12px;border:1px solid #2a3c66;background:#0d1630;color:#eaffff;font-family:inherit;font-weight:700;font-size:16px;cursor:pointer;letter-spacing:.08em;}
+  .keybind-btn.listening{border-color:#00f6ff;box-shadow:0 0 18px #00e5ff33;color:#7efaff;}
+  #previewOverlay{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(3,5,12,0.92);backdrop-filter:blur(10px);z-index:21;padding:24px 12px;overflow-y:auto;}
+  #previewOverlay.active{display:flex;}
+  #previewCanvas{width:min(640px,90vw);height:160px;background:#050b1a;border:1px solid #1a2f52;border-radius:12px;}
+  .preview-meta{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:12px 0;}
+  .preview-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:14px;width:min(640px,90vw);}
+  .preview-actions .play-btn,.preview-actions .pause-btn{margin:0;flex:1;min-width:140px;}
+  #calibrationScreen,#statsScreen{overflow-y:auto;justify-content:flex-start;padding:28px 12px 48px;}
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
+<div id="songProgress"><i id="songProgressFill"></i></div>
 
 <div id="comboText"></div>
 <div id="judgeText"></div>
@@ -184,6 +207,7 @@
   </div>
   <div id="hudRight" style="text-align:right">
     <div class="hud-pill"><span data-i18n="hud.combo">COMBO</span> <span class="hud-big" id="comboEl" style="margin-left:6px">0</span></div>
+    <div class="hud-pill" id="hpRow"><span data-i18n="hud.health">HP</span><span class="hp-track"><i id="hpFill"></i></span></div>
     <div class="hud-pill"><span id="modeEl">DRUMS</span> • <span id="bpmEl">-- BPM</span> • <span id="holdCountEl">HOLD 0</span></div>
   </div>
 </div>
@@ -207,7 +231,7 @@
         <div class="tag" data-i18n="menu.tagAutoBeatmap">Auto beatmap</div>
         <div class="tag" data-i18n="menu.tagHoldNotes">HOLD notes</div>
         <div class="tag bpm-tag" id="detectedBpmTag" style="display:none">-- BPM</div>
-        <div class="tag" data-i18n="menu.tagTapHold">D F J K / tap & hold</div>
+        <div class="tag" id="tagTapHold">D F J K / tap & hold</div>
         <div class="tag" data-i18n="menu.tagOfflineAnalysis">offline analysis</div>
       </div>
     </div>
@@ -222,44 +246,8 @@
 
     <div class="sliders">
       <div class="slider-box">
-        <label><span data-i18n="menu.sensitivity">Sensitivity</span> <span id="sensVal">1.25σ</span></label>
-        <input type="range" id="sens" min="0.5" max="2.5" step="0.05" value="1.25">
-      </div>
-      <div class="slider-box">
-        <label><span data-i18n="menu.fallSpeed">Fall speed</span> <span id="fallVal" data-i18n="menu.fallSpeedAuto">Auto BPM</span></label>
-        <input type="range" id="fallSpeed" min="0.85" max="2.4" step="0.05" value="1.45">
-        <small id="fallHint" style="color:#5a8dad;font-size:10px" data-i18n="menu.fallHintAuto">Auto by BPM, can be disabled below</small>
-      </div>
-      <div class="slider-box">
-        <label><span data-i18n="menu.holdAmount">Long notes</span> <span id="holdVal" data-i18n="menu.holdAuto">Auto</span></label>
-        <input type="range" id="holdAmt" min="0" max="2" step="1" value="1">
-      </div>
-    </div>
-
-    <div class="toggle-row">
-      <label><input type="checkbox" id="bpmAuto" checked> <span data-i18n="menu.bpmAuto">Auto BPM — sync speed</span></label>
-      <label><span data-i18n="menu.beatsLead">Lead:</span>
-        <select id="beatsLead">
-          <option value="2.5" data-i18n="menu.beatsLeadSlow">Slow 2.5 beats</option>
-          <option value="2.0" selected data-i18n="menu.beatsLeadNormal">Normal 2.0 beats</option>
-          <option value="1.6" data-i18n="menu.beatsLeadFast">Fast 1.6 beats</option>
-        </select>
-      </label>
-      <label><input type="checkbox" id="holdEnable" checked> <span data-i18n="menu.holdNotesToggle">HOLD notes</span></label>
-      <label><input type="checkbox" id="dualEnable" checked> <span data-i18n="menu.chordsToggle">Chords</span></label>
-      <label><input type="checkbox" id="autoLane" checked> <span data-i18n="menu.smartLaneToggle">Smart lane layout</span></label>
-      <label><input type="checkbox" id="bgReactiveCheck" checked> <span data-i18n="menu.bgReactive">Background pulse</span></label>
-      <label><input type="checkbox" id="bgSpectrumCheck"> <span data-i18n="menu.bgSpectrum">Bottom equaliser</span></label>
-      <label><input type="checkbox" id="vignetteCheck" checked> <span data-i18n="menu.vignette">Vignette</span></label>
-      <label><input type="checkbox" id="noteTrailsCheck" checked> <span data-i18n="menu.noteTrails">Note trails</span></label>
-      <label><input type="checkbox" id="motionBlurCheck"> <span data-i18n="menu.motionBlur">Motion blur</span></label>
-      <label><input type="checkbox" id="bloomCheck"> <span data-i18n="menu.bloom">Bloom (expensive)</span></label>
-    </div>
-
-    <div class="sliders" style="margin-top:14px">
-      <div class="slider-box">
         <label><span data-i18n="menu.difficulty">Difficulty</span> <span id="difficultyVal">NORMAL</span></label>
-        <select id="difficultySelect" style="width:100%;margin-top:6px;background:#08132a;color:#bfefff;border:1px solid #1d3358;border-radius:8px;padding:6px;font-family:'JetBrains Mono',monospace;">
+        <select id="difficultySelect" style="width:100%;margin-top:6px;background:#08132a;color:#bfefff;border:1px solid #1d3358;border-radius:8px;padding:6px;font-family:ui-monospace,'Cascadia Mono',Consolas,monospace;">
           <option value="easy" data-i18n="menu.difficultyEasy">EASY — ≤2.5 n/s, relaxed</option>
           <option value="normal" selected data-i18n="menu.difficultyNormal">NORMAL — ≤4 n/s</option>
           <option value="hard" data-i18n="menu.difficultyHard">HARD — ≤6.5 n/s</option>
@@ -270,53 +258,6 @@
         <label><span data-i18n="menu.volume">Volume</span> <span id="menuVolumeVal">55%</span></label>
         <input type="range" id="menuVolume" min="0" max="100" step="1" value="55">
       </div>
-      <div class="slider-box">
-        <label data-i18n="menu.fxQuality">FX quality</label>
-        <select id="fxQualitySelect">
-          <option value="high" data-i18n="menu.fxHigh">High (bloom, aberration, all particles)</option>
-          <option value="medium" data-i18n="menu.fxMedium">Medium (no aberration)</option>
-          <option value="low" data-i18n="menu.fxLow">Low (for weak PCs)</option>
-        </select>
-      </div>
-      <div class="slider-box">
-        <label data-i18n="menu.hpss">HPSS (signal separation)</label>
-        <select id="hpssModeSelect">
-          <option value="off" data-i18n="menu.hpssOff">Off (fast, for clean tracks)</option>
-          <option value="hard" selected data-i18n="menu.hpssHard">Hard (standard, best for drums)</option>
-          <option value="soft" data-i18n="menu.hpssSoft">Soft (smooth, best for mixed)</option>
-          <option value="iterative" data-i18n="menu.hpssIterative">Iterative (max quality, ×2 slower)</option>
-        </select>
-      </div>
-      <div class="slider-box">
-        <label data-i18n="menu.nmf">NMF instrument refinement</label>
-        <select id="nmfModeSelect">
-          <option value="off" data-i18n="menu.nmfOff">Off (fastest)</option>
-          <option value="fast" data-i18n="menu.nmfFast">Fast (+2s, weak PCs)</option>
-          <option value="auto" selected data-i18n="menu.nmfAuto">Auto (+4s, recommended)</option>
-          <option value="quality" data-i18n="menu.nmfQuality">Quality (+6s, best)</option>
-        </select>
-      </div>
-      <div class="slider-box">
-        <label><span data-i18n="menu.hitSound">Hit sound (you)</span></label>
-        <select id="hitSoundSelect">
-          <option value="off" data-i18n="menu.hitSoundOff">Off</option>
-          <option value="click" data-i18n="menu.hitSoundClick">Click</option>
-          <option value="kick" data-i18n="menu.hitSoundKick">Kick</option>
-          <option value="snare" data-i18n="menu.hitSoundSnare">Snare</option>
-          <option value="custom" data-i18n="menu.hitSoundCustom">Custom sample…</option>
-        </select>
-        <input type="file" id="hitSoundFile" accept="audio/*" style="display:none">
-        <div id="hitSoundStatus" style="font-size:10px;color:#5da6c8;margin-top:4px"></div>
-      </div>
-      <div class="slider-box">
-        <label><span data-i18n="menu.warmup">Warmup count-in</span> <span id="warmupBeatsVal">4</span></label>
-        <input type="range" id="warmupBeats" min="0" max="8" step="1" value="4">
-        <small style="color:#5a8dad;font-size:10px" data-i18n="menu.warmupHint">0 = off, 4 = one bar</small>
-      </div>
-      <div class="slider-box">
-        <label data-i18n="meta.langLabel">Language</label>
-        <select id="languageSelect"></select>
-      </div>
     </div>
 
     <div id="libraryPanel" style="display:none; margin-top:16px;">
@@ -326,13 +267,15 @@
           <span data-i18n="menu.libraryHeader">Track library (this session)</span>
           <span id="libraryCount" style="color:#5a89a6; font-size:10px;"></span>
         </div>
-        <button id="libClearBtn" style="background:#161a34; color:#8899c0; border:1px solid #2a3c66; border-radius:8px; padding:4px 10px; font-size:11px; cursor:pointer; font-family:'JetBrains Mono',monospace;" data-i18n="menu.libraryClear">Clear all</button>
+        <button id="libClearBtn" style="background:#161a34; color:#8899c0; border:1px solid #2a3c66; border-radius:8px; padding:4px 10px; font-size:11px; cursor:pointer; font-family:ui-monospace,'Cascadia Mono',Consolas,monospace;" data-i18n="menu.libraryClear">Clear all</button>
       </div>
       <div id="libraryList" style="display:flex; flex-direction:column; gap:8px; max-height:320px; overflow-y:auto; padding-right:4px;"></div>
     </div>
 
     <button class="play-btn" id="playBtn" disabled data-i18n="menu.playButtonPickTrack">Load a track first</button>
+    <button class="play-btn secondary" id="demoBtn" data-i18n="menu.demoBtn">▶ Play demo track</button>
     <div style="text-align:center;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <button id="openSettingsBtn" data-i18n="menu.settingsBtn">⚙ Settings</button>
       <button id="openCalibrationBtn" data-i18n="menu.calibrationBtn">⚙ Latency calibration</button>
       <button id="openStatsBtn" data-i18n="menu.statsBtn">📊 Statistics</button>
       <button id="importMapBtn" data-i18n="menu.importMapBtn">📥 Import map</button>
@@ -340,23 +283,26 @@
     </div>
     <div class="hint">
       <span data-i18n="menu.hint">BPM AUTO: game detects BPM and syncs falling speed.</span><br>
-      <span data-i18n="menu.controlsHint">Controls: D F J K tap / hold • ESC to exit.</span>
+      <span id="controlsHint">Controls: D F J K tap / hold • ESC to pause.</span>
     </div>
   </div>
 </div>
 
 <div id="result">
   <div class="panel result-card">
-    <div class="subtitle" data-i18n="results.missionComplete">MISSION COMPLETE</div>
+    <div class="subtitle" id="resultTitle" data-i18n="results.missionComplete">MISSION COMPLETE</div>
     <div class="result-score" id="finalScore">0</div>
     <div class="result-grid">
       <div class="result-item"><span data-i18n="results.accuracy">Accuracy</span><b id="finalAcc">0%</b></div>
       <div class="result-item"><span data-i18n="results.maxCombo">Max combo</span><b id="finalCombo">0</b></div>
       <div class="result-item"><span data-i18n="results.bpm">BPM</span><b id="finalBpm">--</b></div>
+      <div class="result-item"><span data-i18n="results.marvelous">MARVELOUS</span><b id="finalMarvelous">0</b></div>
       <div class="result-item"><span data-i18n="results.perfect">PERFECT</span><b id="finalPerfect">0</b></div>
+      <div class="result-item"><span data-i18n="results.great">GREAT</span><b id="finalGreat">0</b></div>
       <div class="result-item"><span data-i18n="results.good">GOOD</span><b id="finalGood">0</b></div>
-      <div class="result-item"><span data-i18n="results.holds">HOLDS</span><b id="finalHolds">0/0</b></div>
+      <div class="result-item"><span data-i18n="results.ok">OK</span><b id="finalOk">0</b></div>
       <div class="result-item"><span data-i18n="results.miss">MISS</span><b id="finalMiss">0</b></div>
+      <div class="result-item"><span data-i18n="results.holds">HOLDS</span><b id="finalHolds">0/0</b></div>
       <div class="result-item"><span data-i18n="results.speed">Speed</span><b id="finalSpeed">--</b></div>
       <div class="result-item"><span data-i18n="results.score">Score</span><b id="finalScore2">0</b></div>
       <div class="result-item"><span data-i18n="results.fps">FPS avg/1%/min</span><b id="finalFps">--</b></div>
@@ -443,6 +389,136 @@
   </div>
 </div>
 
+
+<div id="settingsScreen">
+  <div class="panel">
+    <div class="cal-title" data-i18n="menu.settingsTitle">SETTINGS</div>
+    <div class="settings-section">
+      <h3 data-i18n="menu.settingsGameplay">Gameplay</h3>
+    <div class="sliders">
+      <div class="slider-box">
+        <label><span data-i18n="menu.sensitivity">Sensitivity</span> <span id="sensVal">1.25σ</span></label>
+        <input type="range" id="sens" min="0.5" max="2.5" step="0.05" value="1.25">
+      </div>
+      <div class="slider-box">
+        <label><span data-i18n="menu.fallSpeed">Fall speed</span> <span id="fallVal" data-i18n="menu.fallSpeedAuto">Auto BPM</span></label>
+        <input type="range" id="fallSpeed" min="0.85" max="2.4" step="0.05" value="1.45">
+        <small id="fallHint" style="color:#5a8dad;font-size:10px" data-i18n="menu.fallHintAuto">Auto by BPM, can be disabled below</small>
+      </div>
+      <div class="slider-box">
+        <label><span data-i18n="menu.holdAmount">Long notes</span> <span id="holdVal" data-i18n="menu.holdAuto">Auto</span></label>
+        <input type="range" id="holdAmt" min="0" max="2" step="1" value="1">
+      </div>
+    </div>
+
+    <div class="toggle-row">
+      <label><input type="checkbox" id="bpmAuto" checked> <span data-i18n="menu.bpmAuto">Auto BPM — sync speed</span></label>
+      <label><span data-i18n="menu.beatsLead">Lead:</span>
+        <select id="beatsLead">
+          <option value="2.5" data-i18n="menu.beatsLeadSlow">Slow 2.5 beats</option>
+          <option value="2.0" selected data-i18n="menu.beatsLeadNormal">Normal 2.0 beats</option>
+          <option value="1.6" data-i18n="menu.beatsLeadFast">Fast 1.6 beats</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="holdEnable" checked> <span data-i18n="menu.holdNotesToggle">HOLD notes</span></label>
+      <label><input type="checkbox" id="dualEnable" checked> <span data-i18n="menu.chordsToggle">Chords</span></label>
+      <label><input type="checkbox" id="autoLane" checked> <span data-i18n="menu.smartLaneToggle">Smart lane layout</span></label>
+      <label><input type="checkbox" id="bgReactiveCheck" checked> <span data-i18n="menu.bgReactive">Background pulse</span></label>
+      <label><input type="checkbox" id="bgSpectrumCheck"> <span data-i18n="menu.bgSpectrum">Bottom equaliser</span></label>
+      <label><input type="checkbox" id="vignetteCheck" checked> <span data-i18n="menu.vignette">Vignette</span></label>
+      <label><input type="checkbox" id="noteTrailsCheck" checked> <span data-i18n="menu.noteTrails">Note trails</span></label>
+      <label><input type="checkbox" id="motionBlurCheck"> <span data-i18n="menu.motionBlur">Motion blur</span></label>
+      <label><input type="checkbox" id="bloomCheck"> <span data-i18n="menu.bloom">Bloom (expensive)</span></label>
+    </div>
+
+    <div class="sliders" style="margin-top:14px">
+      <div class="slider-box">
+        <label data-i18n="menu.fxQuality">FX quality</label>
+        <select id="fxQualitySelect">
+          <option value="high" data-i18n="menu.fxHigh">High (bloom, aberration, all particles)</option>
+          <option value="medium" data-i18n="menu.fxMedium">Medium (no aberration)</option>
+          <option value="low" data-i18n="menu.fxLow">Low (for weak PCs)</option>
+        </select>
+      </div>
+      <div class="slider-box">
+        <label data-i18n="menu.hpss">HPSS (signal separation)</label>
+        <select id="hpssModeSelect">
+          <option value="off" data-i18n="menu.hpssOff">Off (fast, for clean tracks)</option>
+          <option value="hard" selected data-i18n="menu.hpssHard">Hard (standard, best for drums)</option>
+          <option value="soft" data-i18n="menu.hpssSoft">Soft (smooth, best for mixed)</option>
+          <option value="iterative" data-i18n="menu.hpssIterative">Iterative (max quality, ×2 slower)</option>
+        </select>
+      </div>
+      <div class="slider-box">
+        <label data-i18n="menu.nmf">NMF instrument refinement</label>
+        <select id="nmfModeSelect">
+          <option value="off" data-i18n="menu.nmfOff">Off (fastest)</option>
+          <option value="fast" data-i18n="menu.nmfFast">Fast (+2s, weak PCs)</option>
+          <option value="auto" selected data-i18n="menu.nmfAuto">Auto (+4s, recommended)</option>
+          <option value="quality" data-i18n="menu.nmfQuality">Quality (+6s, best)</option>
+        </select>
+      </div>
+      <div class="slider-box">
+        <label><span data-i18n="menu.hitSound">Hit sound (you)</span></label>
+        <select id="hitSoundSelect">
+          <option value="off" data-i18n="menu.hitSoundOff">Off</option>
+          <option value="click" data-i18n="menu.hitSoundClick">Click</option>
+          <option value="kick" data-i18n="menu.hitSoundKick">Kick</option>
+          <option value="snare" data-i18n="menu.hitSoundSnare">Snare</option>
+          <option value="custom" data-i18n="menu.hitSoundCustom">Custom sample…</option>
+        </select>
+        <input type="file" id="hitSoundFile" accept="audio/*" style="display:none">
+        <div id="hitSoundStatus" style="font-size:10px;color:#5da6c8;margin-top:4px"></div>
+      </div>
+      <div class="slider-box">
+        <label><span data-i18n="menu.warmup">Warmup count-in</span> <span id="warmupBeatsVal">4</span></label>
+        <input type="range" id="warmupBeats" min="0" max="8" step="1" value="4">
+        <small style="color:#5a8dad;font-size:10px" data-i18n="menu.warmupHint">0 = off, 4 = one bar</small>
+      </div>
+      <div class="slider-box">
+        <label data-i18n="meta.langLabel">Language</label>
+        <select id="languageSelect"></select>
+      </div>
+    </div>
+
+
+      <div class="toggle-row">
+        <label><input type="checkbox" id="noFailCheck"> <span data-i18n="menu.noFail">No Fail (never die)</span></label>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3 data-i18n="menu.settingsKeybinds">Controls</h3>
+      <div class="cal-desc" data-i18n="menu.keybindHint">Click a lane, then press a key</div>
+      <div class="keybind-row">
+        <button type="button" class="keybind-btn" id="keybind0">D</button>
+        <button type="button" class="keybind-btn" id="keybind1">F</button>
+        <button type="button" class="keybind-btn" id="keybind2">J</button>
+        <button type="button" class="keybind-btn" id="keybind3">K</button>
+      </div>
+    </div>
+    <div class="cal-row" style="margin-top:18px">
+      <button class="cal-btn" id="settingsCloseBtn" data-i18n="menu.settingsBack">← Back to menu</button>
+    </div>
+  </div>
+</div>
+
+<div id="previewOverlay">
+  <div class="anl-title" data-i18n="menu.previewTitle">MAP PREVIEW</div>
+  <div class="anl-track" id="previewTrackName">—</div>
+  <canvas id="previewCanvas" width="640" height="160"></canvas>
+  <div class="preview-meta">
+    <div class="tag" id="previewNotes">0 notes</div>
+    <div class="tag" id="previewHolds">0 holds</div>
+    <div class="tag" id="previewDensity">0/s</div>
+    <div class="tag bpm-tag" id="previewBpm">-- BPM</div>
+  </div>
+  <div class="preview-actions">
+    <button class="play-btn" id="previewPlayBtn" data-i18n="menu.previewPlay">▶ Play</button>
+    <button class="pause-btn" id="previewBotBtn" data-i18n="menu.libraryBot" style="margin:0">Bot</button>
+    <button class="pause-btn" id="previewBackBtn" data-i18n="menu.previewBack" style="margin:0">← Back</button>
+  </div>
+</div>
+
 <div id="pauseScreen">
   <div class="pause-panel">
     <div class="pause-title" data-i18n="pause.title">PAUSE</div>
@@ -454,7 +530,7 @@
     </div>
     <div class="pause-vol">
       <label data-i18n="pause.hitSoundLabel">🥁 Your hit sound</label>
-      <select id="pauseHitSound" style="flex:1;background:#0a1a34;color:#bfefff;border:1px solid #254567;border-radius:7px;padding:6px;font-family:'JetBrains Mono',monospace;font-size:12px">
+      <select id="pauseHitSound" style="flex:1;background:#0a1a34;color:#bfefff;border:1px solid #254567;border-radius:7px;padding:6px;font-family:ui-monospace,'Cascadia Mono',Consolas,monospace;font-size:12px">
         <option value="off">Off</option>
         <option value="click">Click</option>
         <option value="kick">Kick</option>
@@ -464,7 +540,7 @@
     </div>
     <div class="pause-vol" id="pauseBotHitRow" style="display:none">
       <label data-i18n="pause.botHitSoundLabel">🤖 Bot hit sound</label>
-      <select id="pauseBotHitSound" style="flex:1;background:#0a1a34;color:#bfefff;border:1px solid #254567;border-radius:7px;padding:6px;font-family:'JetBrains Mono',monospace;font-size:12px">
+      <select id="pauseBotHitSound" style="flex:1;background:#0a1a34;color:#bfefff;border:1px solid #254567;border-radius:7px;padding:6px;font-family:ui-monospace,'Cascadia Mono',Consolas,monospace;font-size:12px">
         <option value="off">Off</option>
         <option value="click">Click</option>
         <option value="kick">Kick</option>

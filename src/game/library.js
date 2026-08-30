@@ -1,11 +1,8 @@
-// Etap E (v1.24): In-session track library.
-//
-// Holds a list of loaded audio files in memory (no persistence). Each entry:
-//   { id, name, size, duration, bpm, difficulty, audioBuffer, fileBytes,
-//     analysis?, genre? }
-//
-// Analysis result is cached per track when it's played, so replaying the
-// same track from the library skips the 5-8 s analysis.
+// Track library — in-memory list + IndexedDB persistence across reloads.
+
+import {
+  putLibraryTrack, deleteLibraryTrack, listLibraryTracks, clearLibraryStore, sha1,
+} from '../audio/cache.js';
 
 let nextId = 1;
 const tracks = [];
@@ -15,8 +12,10 @@ const listeners = new Set();
  * Add a decoded track to the library.
  * @returns {number} id
  */
-export function addTrack(entry) {
-  const id = nextId++;
+export function addTrack(entry, opts = {}) {
+  const persist = opts.persist !== false && !entry.isDemo;
+  const id = entry.id != null ? entry.id : nextId++;
+  if (id >= nextId) nextId = id + 1;
   const track = {
     id,
     name: entry.name || 'Untitled',
@@ -27,21 +26,25 @@ export function addTrack(entry) {
     fileBytes: entry.fileBytes,
     fileHash: entry.fileHash || '',
     genre: entry.genre || '',
-    bpm: 0,
-    difficulty: 0,   // 0..5 stars, filled after analysis
+    bpm: entry.bpm || 0,
+    difficulty: entry.difficulty || 0,
     analysis: null,
-    addedAt: Date.now(),
+    addedAt: entry.addedAt || Date.now(),
+    isDemo: !!entry.isDemo,
   };
   tracks.push(track);
   emit();
+  if (persist) putLibraryTrack(track);
   return id;
 }
 
 export function removeTrack(id) {
   const idx = tracks.findIndex(t => t.id === id);
   if (idx < 0) return;
+  const was = tracks[idx];
   tracks.splice(idx, 1);
   emit();
+  if (!was.isDemo) deleteLibraryTrack(id);
 }
 
 export function getTrack(id) {
@@ -57,6 +60,15 @@ export function updateTrack(id, patch) {
   if (!t) return;
   Object.assign(t, patch);
   emit();
+  if (!t.isDemo) putLibraryTrack(t);
+}
+
+export function clearAllTracks() {
+  const ids = tracks.map(t => t.id);
+  tracks.length = 0;
+  emit();
+  for (const id of ids) deleteLibraryTrack(id);
+  clearLibraryStore();
 }
 
 export function onLibraryChange(cb) {
@@ -71,12 +83,55 @@ function emit() {
 }
 
 /**
- * Difficulty stars (0..5) from BPM + note density. Approx heuristic:
- *   <90 BPM or <2 nps           → 1 star
- *   90-110 BPM, 2-3 nps         → 2 stars
- *   110-130 BPM, 3-4 nps        → 3 stars
- *   130-160 BPM, 4-6 nps        → 4 stars
- *   >160 BPM or >6 nps          → 5 stars
+ * Reload persisted tracks from IndexedDB and decode them.
+ * @param {AudioContext} audioCtx
+ */
+export async function restoreLibrary(audioCtx) {
+  if (!audioCtx) return [];
+  let rows = [];
+  try {
+    rows = await listLibraryTracks();
+  } catch {
+    return [];
+  }
+  rows.sort((a, b) => (a.addedAt || 0) - (b.addedAt || 0));
+  const restored = [];
+  for (const row of rows) {
+    if (!row.fileBytes) continue;
+    try {
+      const bytes = row.fileBytes instanceof Uint8Array
+        ? row.fileBytes
+        : new Uint8Array(row.fileBytes);
+      const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      const audioBuffer = await audioCtx.decodeAudioData(ab.slice(0));
+      let fileHash = row.fileHash || '';
+      if (!fileHash) {
+        try { fileHash = await sha1(bytes); } catch { /* ignore */ }
+      }
+      const id = addTrack({
+        id: row.id,
+        name: row.name,
+        size: row.size || bytes.byteLength,
+        duration: audioBuffer.duration,
+        sampleRate: audioBuffer.sampleRate,
+        audioBuffer,
+        fileBytes: bytes,
+        fileHash,
+        bpm: row.bpm || 0,
+        difficulty: row.difficulty || 0,
+        genre: row.genre || '',
+        addedAt: row.addedAt,
+      }, { persist: false });
+      restored.push(getTrack(id));
+    } catch (e) {
+      console.warn('failed to restore track', row.name, e);
+    }
+  }
+  return restored;
+}
+
+/**
+ * Difficulty stars (0..5) from BPM + note density.
  */
 export function difficultyStars(bpm, notesPerSec) {
   const bpmScore =
@@ -92,10 +147,6 @@ export function difficultyStars(bpm, notesPerSec) {
   return Math.round((bpmScore + npsScore) / 2);
 }
 
-/**
- * Best-guess genre tag from BPM (very approximate — user can override).
- * We use it only for display, not for anything analytical.
- */
 export function guessGenreFromBpm(bpm) {
   if (bpm < 70) return 'Ballad';
   if (bpm < 90) return 'Downtempo';

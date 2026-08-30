@@ -1,10 +1,9 @@
-// Central configuration constants. Etap 0 = keep parity with v1.1.
-// Later etaps will extend this with judge windows, camera shake, etc.
+// Central configuration constants.
 
 export const LANES = 4;
 
 // Displayed in the corner and results screen so we know which build is running.
-export const APP_VERSION = '1.24.5';
+export const APP_VERSION = '1.25.0';
 
 // Judge windows (seconds) — base values, multiplied by calibration.judgeMultiplier() at runtime.
 // v1.2: 6 tiers instead of 3 for finer feedback. MISS = anything past OK.
@@ -39,6 +38,19 @@ export const SCORE = {
   COMBO_BONUS_MAX_HOLD: 120,
 };
 
+// HP. Misses drain, good hits recover. 0 = fail (unless No Fail).
+export const HEALTH = {
+  START: 100,
+  MARVELOUS: 4,
+  PERFECT:   3,
+  GREAT:     1,
+  GOOD:      0,
+  OK:       -4,
+  MISS:    -10,
+  BREAK:   -12,
+  HOLD_OK:   3,
+};
+
 // Colours per judgement tier
 export const JUDGE_COLORS = {
   MARVELOUS: '#fff4a3',
@@ -57,6 +69,7 @@ export const JUDGE_COLORS = {
 export const LANE_COLORS = ['#39eaff', '#61ffa7', '#ffae3a', '#ff55c6'];
 
 // Keyboard mapping (KeyboardEvent.code → lane)
+// Default layout. Runtime remaps live in settings.laneKeys; input.js uses keys.js.
 export const KEY_MAP = {
   KeyD:0, KeyA:0, Digit1:0, Numpad1:0,
   KeyF:1, KeyS:1, Digit2:1, Numpad2:1,
@@ -72,7 +85,7 @@ export const RENDER = {
   DPR_MAX: 2,
 };
 
-// Analyzer defaults (legacy v1.1 values, will be reworked in Etap 1)
+// Analyzer defaults
 export const ANALYZER = {
   FRAME_SIZE: 1024,
   HOP: 512,

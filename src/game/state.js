@@ -1,7 +1,7 @@
 // Shared mutable game state. Single source of truth for all modules.
 // Kept intentionally simple (no reactivity) — we're in a tight render loop.
 
-import { LANES } from '../config.js';
+import { LANES, HEALTH } from '../config.js';
 
 export const state = {
   // Audio
@@ -21,22 +21,25 @@ export const state = {
   bpmDrift: 0,
   beatTimes: [],
 
-  // Scoring
+  // Scoring — six tap tiers + holds
   score: 0,
   combo: 0,
   maxCombo: 0,
+  marvelous: 0,
   perfects: 0,
+  greats: 0,
   goods: 0,
+  oks: 0,
   misses: 0,
   hits: 0,
   holdsOk: 0,
   holdsTotal: 0,
+  health: HEALTH.START,
+  failed: false,
 
   // Runtime
   gameRunning: false,
   paused: false,
-  pauseStart: 0,       // audioCtx.currentTime when paused
-  pauseOffset: 0,      // cumulative pause seconds — subtracted from songTime
   startTime: 0,
   fallTime: 1.45,
   mode: 'drums',
@@ -65,11 +68,16 @@ export function resetPlayState() {
   state.score = 0;
   state.combo = 0;
   state.maxCombo = 0;
+  state.marvelous = 0;
   state.perfects = 0;
+  state.greats = 0;
   state.goods = 0;
+  state.oks = 0;
   state.misses = 0;
   state.hits = 0;
   state.holdsOk = 0;
+  state.health = HEALTH.START;
+  state.failed = false;
   state.bullets.length = 0;
   state.particles.length = 0;
   state._notesCursor = 0;

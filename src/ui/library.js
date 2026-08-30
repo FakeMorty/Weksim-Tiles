@@ -6,7 +6,7 @@
 // Selecting a card sets it as the current track. Play analyses + starts.
 // Bot analyses + starts in autopilot mode.
 
-import { listTracks, removeTrack, onLibraryChange, difficultyStars, guessGenreFromBpm } from '../game/library.js';
+import { listTracks, removeTrack, clearAllTracks, onLibraryChange, difficultyStars, guessGenreFromBpm } from '../game/library.js';
 import { state } from '../game/state.js';
 import { t } from '../i18n/i18n.js';
 
@@ -21,8 +21,7 @@ export function bindLibrary(handlers) {
   if (clearBtn) {
     clearBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const tracks = listTracks();
-      for (const tr of tracks) removeTrack(tr.id);
+      clearAllTracks();
     });
   }
   // Header toggles collapse

@@ -5,8 +5,8 @@ import { render } from '../render/renderer.js';
 import { fireBullet, finishHold, songTime, judgeTime, renderTime, getHoldBars, resetHitStats } from './judge.js';
 import { spawnTickParticle, spawnMissParticles, resetParticles } from '../fx/particles.js';
 import { showJudge } from '../fx/toasts.js';
-import { updateHUD } from '../ui/hud.js';
-import { LANES, JUDGE, JUDGE_COLORS } from '../config.js';
+import { updateHUD, updateSongProgress, setSongProgressVisible } from '../ui/hud.js';
+import { LANES, JUDGE, JUDGE_COLORS, HEALTH } from '../config.js';
 import { judgeMultiplier } from './calibration.js';
 import { drawHitChart } from '../ui/hitChart.js';
 import { recordPlay, bestScoreFor } from './stats.js';
@@ -20,6 +20,8 @@ import { scheduleCountIn } from './warmup.js';
 import { bindHitSoundOutput, stopAllHoldSounds } from './hitsound.js';
 import { startReplayRecording, stopReplayRecording } from './replay.js';
 import { startBot, stopBot } from './bot.js';
+import { applyHealth } from './health.js';
+import { computeAccuracy, hitCount, judgedCount } from './accuracy.js';
 
 let lastFrame = performance.now();
 
@@ -41,13 +43,16 @@ export function startPlay() {
   resetPerf();
   state.gameRunning = true;
   state.paused = false;
-  state.pauseOffset = 0;
 
   document.getElementById('menu').style.display = 'none';
   document.getElementById('result').style.display = 'none';
   document.getElementById('pauseScreen').style.display = 'none';
+  document.getElementById('previewOverlay')?.classList.remove('active');
+  const settingsEl = document.getElementById('settingsScreen');
+  if (settingsEl) settingsEl.style.display = 'none';
   document.getElementById('hud').style.display = 'flex';
   document.getElementById('bottomBar').style.display = 'flex';
+  setSongProgressVisible(true);
   const modeKey = 'menu.mode' + state.mode.charAt(0).toUpperCase() + state.mode.slice(1);
   document.getElementById('modeEl').textContent = t(modeKey);
   document.getElementById('bpmEl').textContent = state.currentBpm ? t('hud.bpmValue', { bpm: Math.round(state.currentBpm) }) : '--';
@@ -107,7 +112,6 @@ export function startPlay() {
 export async function pauseGame() {
   if (!state.gameRunning || state.paused) return;
   state.paused = true;
-  state.pauseStart = state.audioCtx.currentTime;
   try { await state.audioCtx.suspend(); } catch {}
   document.getElementById('pauseScreen').style.display = 'flex';
   // Etap E: show bot hit-sound switcher only when bot is playing this run
@@ -118,9 +122,12 @@ export async function pauseGame() {
 export async function resumeGame() {
   if (!state.gameRunning || !state.paused) return;
   try { await state.audioCtx.resume(); } catch {}
-  state.pauseOffset += state.audioCtx.currentTime - state.pauseStart;
   state.paused = false;
   document.getElementById('pauseScreen').style.display = 'none';
+  // If the player released a HOLD during pause, break it now that time unfreezes.
+  for (let i = 0; i < LANES; i++) {
+    if (state.activeHold[i] && !state.keysDown[i]) finishHold(i, false);
+  }
   lastFrame = performance.now();
   requestAnimationFrame(loop);
 }
@@ -167,6 +174,7 @@ export async function exitToMenu() {
   document.getElementById('bpmBadge').style.display = 'none';
   document.getElementById('pauseScreen').style.display = 'none';
   document.getElementById('result').style.display = 'none';
+  setSongProgressVisible(false);
   document.getElementById('menu').style.display = 'flex';
 }
 
@@ -195,15 +203,25 @@ export function endGame() {
   document.getElementById('bottomBar').style.display = 'none';
   document.getElementById('bpmBadge').style.display = 'none';
   document.getElementById('pauseScreen').style.display = 'none';
-  const totalJudged = state.perfects + state.goods + state.misses;
-  const acc = totalJudged ? Math.round((state.perfects * 1 + state.goods * 0.58) / totalJudged * 100) : 100;
+  setSongProgressVisible(false);
+  const totalJudged = judgedCount(state);
+  const acc = computeAccuracy(state);
   const nfLocale = getLocale() === 'ru' ? 'ru-RU' : getLocale();
+  const titleEl = document.getElementById('resultTitle');
+  if (titleEl) {
+    titleEl.textContent = t(state.failed ? 'results.missionFailed' : 'results.missionComplete');
+    titleEl.style.color = state.failed ? '#ff6a7a' : '';
+  }
   document.getElementById('finalScore').textContent = state.score.toLocaleString(nfLocale);
   document.getElementById('finalScore2').textContent = state.score.toLocaleString(nfLocale);
   document.getElementById('finalAcc').textContent = acc + '%';
   document.getElementById('finalCombo').textContent = state.maxCombo;
-  document.getElementById('finalPerfect').textContent = state.perfects;
-  document.getElementById('finalGood').textContent = state.goods;
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setTxt('finalMarvelous', state.marvelous);
+  setTxt('finalPerfect', state.perfects);
+  setTxt('finalGreat', state.greats);
+  setTxt('finalGood', state.goods);
+  setTxt('finalOk', state.oks);
   document.getElementById('finalHolds').textContent = state.holdsOk + ' / ' + state.holdsTotal;
   document.getElementById('finalMiss').textContent = state.misses;
   document.getElementById('finalBpm').textContent = state.currentBpm ? Math.round(state.currentBpm) : '--';
@@ -230,9 +248,13 @@ export function endGame() {
       score: state.score,
       accuracy: acc,
       maxCombo: state.maxCombo,
+      marvelous: state.marvelous,
       perfects: state.perfects,
+      greats: state.greats,
       goods: state.goods,
+      oks: state.oks,
       misses: state.misses,
+      failed: !!state.failed,
       holdsOk: state.holdsOk,
       holdsTotal: state.holdsTotal,
       notes: state.notes.length,
@@ -288,7 +310,7 @@ function loop(now) {
         const prog = Math.max(0, Math.min(1, (tJudge - hn.time) / dur));
         const prevProg = Math.max(0, prog - dt / dur);
         hn.holdProgress = prog;
-        holdBars[lane].style.width = (prog * 100).toFixed(1) + '%';
+        if (holdBars?.[lane]) holdBars[lane].style.width = (prog * 100).toFixed(1) + '%';
         if (Math.floor(prog * 40) !== Math.floor(prevProg * 40)) {
           state.score += 4;
           if (Math.random() < 0.35) spawnTickParticle(lane);
@@ -299,11 +321,12 @@ function loop(now) {
       }
     } else {
       state.beams[lane] = Math.max(0, state.beams[lane] - dt * 6);
-      holdBars[lane].style.width = '0%';
+      if (holdBars?.[lane]) holdBars[lane].style.width = '0%';
     }
   }
 
   render(tRender, dt);
+  updateSongProgress(songTime(), state.audioBuffer?.duration || 1);
 
   // v1.24.5: cursor-based miss scan instead of iterating all notes every frame.
   // Notes are sorted by time; once a note is past miss window we can advance.
@@ -325,6 +348,7 @@ function loop(now) {
     if (!n.isHold) {
       if (tJudge - n.time > missWindow) {
         n.judged = true; state.combo = 0; state.misses++;
+        applyHealth(HEALTH.MISS);
         showJudge(t('judge.miss'), JUDGE_COLORS.MISS);
         spawnMissParticles(n.lane);
         shake(2.5, 0.2);
@@ -334,6 +358,7 @@ function loop(now) {
     } else {
       if (!n.holding && tJudge - n.time > missWindow) {
         n.judged = true; state.combo = 0; state.misses++;
+        applyHealth(HEALTH.MISS);
         showJudge(t('judge.miss'), JUDGE_COLORS.MISS);
         spawnMissParticles(n.lane);
         shake(2.5, 0.2);
@@ -348,6 +373,11 @@ function loop(now) {
     if (i === newCursor) newCursor++;
   }
   state._missCursor = newCursor;
+
+  if (state.failed) {
+    endGame();
+    return;
+  }
 
   if (state.audioBuffer && songTime() > state.audioBuffer.duration + 0.85) {
     endGame();

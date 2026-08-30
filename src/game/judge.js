@@ -2,7 +2,7 @@
 // Etap 5: 6-tier judgement, per-user offset compensation, judge strictness modes.
 
 import { state } from '../game/state.js';
-import { JUDGE, SCORE, JUDGE_COLORS, LANES } from '../config.js';
+import { JUDGE, SCORE, JUDGE_COLORS, LANES, HEALTH } from '../config.js';
 import { calibration, judgeMultiplier } from './calibration.js';
 import { laneMetrics, hitY } from '../utils/canvas.js';
 import { spawnHitParticles, spawnMissParticles, spawnShockwave } from '../fx/particles.js';
@@ -13,6 +13,7 @@ import { updateHUD } from '../ui/hud.js';
 import { shake, zoomPulse, tiltPulse } from '../render/camera.js';
 import { flashLane, flashHitLine, flashScreen, bumpAberration } from '../fx/flash.js';
 import { t } from '../i18n/i18n.js';
+import { applyHealth } from './health.js';
 
 // Map internal tier codes to translation keys.
 const TIER_KEY = {
@@ -90,8 +91,8 @@ export function pressDown(lane) {
   if (state.keysDown[lane]) return;
   state.keysDown[lane] = true;
   recordEvent('down', lane, state.audioCtx?.currentTime);
-  laneKeysEls[lane].classList.add('active');
-  laneKeysEls[lane].classList.add('holding');
+  laneKeysEls?.[lane]?.classList.add('active');
+  laneKeysEls?.[lane]?.classList.add('holding');
   fireBullet(lane, false);
   state.lastShotTime[lane] = songTime();
   state.flashes[lane] = 1;
@@ -116,7 +117,16 @@ export function pressDown(lane) {
     best.holding = true;
     best.holdProgress = 0;
     state.activeHold[lane] = best;
-    if (holdResult.perfect) state.perfects++; else state.goods++;
+    if (holdResult.perfect) {
+      // HOLD_MARVELOUS vs HOLD_PERFECT both currently share the same toast,
+      // but score differs — count the tighter window as marvelous.
+      if (bestDiff <= JUDGE.HOLD_MARVELOUS * mult) state.marvelous++;
+      else state.perfects++;
+      applyHealth(HEALTH.PERFECT);
+    } else {
+      state.goods++;
+      applyHealth(HEALTH.GOOD);
+    }
     state.combo++; if (state.combo > state.maxCombo) state.maxCombo = state.combo;
     state.score += holdResult.add + Math.min(SCORE.COMBO_BONUS_MAX_HOLD, state.combo * 5);
     hitOffsets.push(bestSigned * 1000);
@@ -149,8 +159,12 @@ export function pressDown(lane) {
   const tapResult = tapBest ? classifyTap(tapDiff, mult) : null;
   if (tapResult) {
     tapBest.judged = true;
-    if (tapResult.tier === 'MARVELOUS' || tapResult.tier === 'PERFECT') state.perfects++;
-    else state.goods++;
+    if (tapResult.tier === 'MARVELOUS') state.marvelous++;
+    else if (tapResult.tier === 'PERFECT') state.perfects++;
+    else if (tapResult.tier === 'GREAT') state.greats++;
+    else if (tapResult.tier === 'GOOD') state.goods++;
+    else state.oks++;
+    applyHealth(HEALTH[tapResult.tier] ?? 0);
     state.combo++; if (state.combo > state.maxCombo) state.maxCombo = state.combo;
     state.score += tapResult.add + Math.min(SCORE.COMBO_BONUS_MAX_TAP, state.combo * 7);
     hitOffsets.push(tapSigned * 1000);
@@ -185,7 +199,7 @@ export function pressDown(lane) {
     }
     updateHUD();
   } else {
-    if (state.combo > 5) { state.combo = Math.max(0, state.combo - 1); updateHUD(); }
+    // Empty tap: mania-style — no combo break, no miss.
     showJudge('\u2014', '#6a8aa0', 0.6);
   }
 }
@@ -193,8 +207,8 @@ export function pressDown(lane) {
 export function pressUp(lane) {
   state.keysDown[lane] = false;
   recordEvent('up', lane, state.audioCtx?.currentTime);
-  laneKeysEls[lane].classList.remove('active');
-  laneKeysEls[lane].classList.remove('holding');
+  laneKeysEls?.[lane]?.classList.remove('active');
+  laneKeysEls?.[lane]?.classList.remove('holding');
   const hn = state.activeHold[lane];
   if (hn) {
     const tNow = judgeTime();
@@ -209,7 +223,7 @@ export function finishHold(lane, success) {
   state.activeHold[lane] = null;
   n.holding = false;
   n.judged = true;
-  holdBars[lane].style.width = '0%';
+  if (holdBars?.[lane]) holdBars[lane].style.width = '0%';
   // v1.24.3: stop the legato sustain that was started when this HOLD began.
   // On success it fades softly; on break it cuts harder for feedback.
   stopHoldSound(state.botMode ? 'bot' : 'player', lane, success ? 0.08 : 0.03);
@@ -218,6 +232,7 @@ export function finishHold(lane, success) {
     const bonus = SCORE.HOLD_COMPLETE_BASE + Math.floor((n.endTime - n.time) * SCORE.HOLD_COMPLETE_PER_SEC);
     state.score += bonus;
     state.combo++; if (state.combo > state.maxCombo) state.maxCombo = state.combo;
+    applyHealth(HEALTH.HOLD_OK);
     showJudge(t('judge.holdOk'), JUDGE_COLORS.HOLD_OK);
     spawnHitParticles(lane, true, 'PERFECT');
     shake(2.5, 0.22);
@@ -225,6 +240,7 @@ export function finishHold(lane, success) {
     flashLane(lane, JUDGE_COLORS.HOLD_OK, 1);
   } else {
     state.combo = 0; state.misses++;
+    applyHealth(HEALTH.BREAK);
     showJudge(t('judge.break'), JUDGE_COLORS.BREAK);
     spawnMissParticles(lane);
     shake(5, 0.35);
