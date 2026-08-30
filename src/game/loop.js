@@ -8,20 +8,22 @@ import { showJudge } from '../fx/toasts.js';
 import { updateHUD, updateSongProgress, setSongProgressVisible } from '../ui/hud.js';
 import { LANES, JUDGE, JUDGE_COLORS, HEALTH } from '../config.js';
 import { judgeMultiplier } from './calibration.js';
-import { drawHitChart } from '../ui/hitChart.js';
-import { recordPlay, bestScoreFor } from './stats.js';
+import { recordPlay } from './stats.js';
 import { resetCamera, shake } from '../render/camera.js';
 import { resetFlashes, flashScreen } from '../fx/flash.js';
 import { settings } from './settings.js';
 import { resetPerf, summarisePerf } from '../utils/perf.js';
 import { attachAnalyser, detachAnalyser } from '../fx/musicReactive.js';
-import { t, getLocale } from '../i18n/i18n.js';
+import { t } from '../i18n/i18n.js';
 import { scheduleCountIn } from './warmup.js';
 import { bindHitSoundOutput, stopAllHoldSounds } from './hitsound.js';
 import { startReplayRecording, stopReplayRecording } from './replay.js';
 import { startBot, stopBot } from './bot.js';
 import { applyHealth, setFailHandler } from './health.js';
-import { computeAccuracy, hitCount, judgedCount } from './accuracy.js';
+import { computeAccuracy, judgedCount } from './accuracy.js';
+import { showResults } from '../ui/results.js';
+import { resetErrorBar, setErrorBarVisible } from '../ui/errorBar.js';
+import { setDocTitle, setPlayCursorMode } from '../ui/chrome.js';
 
 let lastFrame = performance.now();
 
@@ -53,6 +55,12 @@ export function startPlay() {
   document.getElementById('hud').style.display = 'flex';
   document.getElementById('bottomBar').style.display = 'flex';
   setSongProgressVisible(true);
+  setErrorBarVisible(true);
+  resetErrorBar();
+  setPlayCursorMode(true);
+  setDocTitle(state.fileName);
+  const hudTrack = document.getElementById('hudTrack');
+  if (hudTrack) hudTrack.textContent = state.fileName || '—';
   const modeKey = 'menu.mode' + state.mode.charAt(0).toUpperCase() + state.mode.slice(1);
   document.getElementById('modeEl').textContent = t(modeKey);
   document.getElementById('bpmEl').textContent = state.currentBpm ? t('hud.bpmValue', { bpm: Math.round(state.currentBpm) }) : '--';
@@ -117,6 +125,7 @@ export async function pauseGame() {
   // Etap E: show bot hit-sound switcher only when bot is playing this run
   const botRow = document.getElementById('pauseBotHitRow');
   if (botRow) botRow.style.display = state.botMode ? 'flex' : 'none';
+  setPlayCursorMode(false);
 }
 
 export async function resumeGame() {
@@ -124,6 +133,7 @@ export async function resumeGame() {
   try { await state.audioCtx.resume(); } catch {}
   state.paused = false;
   document.getElementById('pauseScreen').style.display = 'none';
+  setPlayCursorMode(true);
   // If the player released a HOLD during pause, break it now that time unfreezes.
   for (let i = 0; i < LANES; i++) {
     if (state.activeHold[i] && !state.keysDown[i]) finishHold(i, false);
@@ -175,6 +185,9 @@ export async function exitToMenu() {
   document.getElementById('pauseScreen').style.display = 'none';
   document.getElementById('result').style.display = 'none';
   setSongProgressVisible(false);
+  setErrorBarVisible(false);
+  setPlayCursorMode(false);
+  setDocTitle(null);
   document.getElementById('menu').style.display = 'flex';
 }
 
@@ -191,7 +204,6 @@ export function endGame() {
   stopAllHoldSounds();
   const replayJson = stopReplayRecording();
   if (replayJson) state.lastReplay = replayJson;
-  // Stop audio so onended can't fire again for a stale source
   detachAnalyser();
   if (state.sourceNode) {
     try { state.sourceNode.onended = null; } catch {}
@@ -204,40 +216,10 @@ export function endGame() {
   document.getElementById('bpmBadge').style.display = 'none';
   document.getElementById('pauseScreen').style.display = 'none';
   setSongProgressVisible(false);
+  setPlayCursorMode(false);
   const totalJudged = judgedCount(state);
   const acc = computeAccuracy(state);
-  const nfLocale = getLocale() === 'ru' ? 'ru-RU' : getLocale();
-  const titleEl = document.getElementById('resultTitle');
-  if (titleEl) {
-    titleEl.textContent = t(state.failed ? 'results.missionFailed' : 'results.missionComplete');
-    titleEl.style.color = state.failed ? '#ff6a7a' : '';
-  }
-  document.getElementById('finalScore').textContent = state.score.toLocaleString(nfLocale);
-  document.getElementById('finalScore2').textContent = state.score.toLocaleString(nfLocale);
-  document.getElementById('finalAcc').textContent = acc + '%';
-  document.getElementById('finalCombo').textContent = state.maxCombo;
-  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-  setTxt('finalMarvelous', state.marvelous);
-  setTxt('finalPerfect', state.perfects);
-  setTxt('finalGreat', state.greats);
-  setTxt('finalGood', state.goods);
-  setTxt('finalOk', state.oks);
-  document.getElementById('finalHolds').textContent = state.holdsOk + ' / ' + state.holdsTotal;
-  document.getElementById('finalMiss').textContent = state.misses;
-  document.getElementById('finalBpm').textContent = state.currentBpm ? Math.round(state.currentBpm) : '--';
-  document.getElementById('finalSpeed').textContent = state.fallTime.toFixed(2) + 's';
   const fpsSummary = summarisePerf();
-  const fpsEl = document.getElementById('finalFps');
-  if (fpsEl) {
-    fpsEl.textContent = fpsSummary.avg + ' / ' + fpsSummary.p1 + ' / ' + fpsSummary.min;
-    fpsEl.title = 'average / 1% low / minimum FPS during play';
-    // Colour code
-    fpsEl.style.color = fpsSummary.avg >= 55 ? '#7dfffa'
-                     : fpsSummary.avg >= 40 ? '#ffd86a'
-                     : '#ff6a7a';
-  }
-  // Etap 10: record play into localStorage stats. Only if there was actual
-  // play activity (avoid recording an accidental exit-immediately click).
   if (totalJudged > 0) {
     recordPlay({
       songHash: state.fileHash,
@@ -262,25 +244,9 @@ export function endGame() {
       fpsAvg: fpsSummary.avg,
     });
   }
-
-  // Etap 10: show previous best score for this song+difficulty, if any
-  const bestEl = document.getElementById('finalBest');
-  if (bestEl) {
-    const best = state.fileHash && bestScoreFor(state.fileHash, state.currentDifficulty || 'normal');
-    if (best && best.date !== Date.now()) {
-      const isNew = state.score >= best.score;
-      bestEl.innerHTML = isNew
-        ? '<span style="color:#fff4a3">' + t('results.newBest') + '</span>'
-        : best.score.toLocaleString(nfLocale) + ' <small style="color:#5a89a6">(' + best.accuracy + '%)</small>';
-    } else {
-      bestEl.textContent = '\u2014';
-    }
-  }
-
-  document.getElementById('result').style.display = 'flex';
-  // Etap 5: draw hit-offset histogram
-  setTimeout(() => drawHitChart(document.getElementById('hitChart')), 30);
+  showResults({ acc, fpsSummary });
 }
+
 
 function loop(now) {
   if (!state.gameRunning) return;

@@ -4,7 +4,7 @@ import { LANES } from '../config.js';
 import { state } from './state.js';
 import { pressDown, pressUp } from './judge.js';
 import { view, laneMetrics } from '../utils/canvas.js';
-import { pauseGame, resumeGame } from './loop.js';
+import { pauseGame, resumeGame, restartCurrent } from './loop.js';
 import { laneFromCode } from './keys.js';
 
 export function bindInput() {
@@ -15,7 +15,18 @@ export function bindInput() {
       e.preventDefault();
       return;
     }
-    if (state.paused) return; // ignore lane keys while paused
+    if (state.paused) {
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'BUTTON' || tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.code === 'Space' || e.code === 'Enter') {
+        e.preventDefault();
+        resumeGame();
+      } else if (e.code === 'KeyR') {
+        e.preventDefault();
+        restartCurrent();
+      }
+      return;
+    }
     const lane = laneFromCode(e.code);
     if (lane === undefined) return;
     e.preventDefault();

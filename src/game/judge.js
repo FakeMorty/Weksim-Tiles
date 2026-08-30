@@ -8,7 +8,8 @@ import { laneMetrics, hitY } from '../utils/canvas.js';
 import { spawnHitParticles, spawnMissParticles, spawnShockwave } from '../fx/particles.js';
 import { playHitSound, startHoldSound, stopHoldSound } from './hitsound.js';
 import { recordEvent } from './replay.js';
-import { showJudge, showCombo, showHoldToast } from '../fx/toasts.js';
+import { showJudge, showCombo, showHoldToast, showTiming } from '../fx/toasts.js';
+import { pushErrorTick } from '../ui/errorBar.js';
 import { updateHUD } from '../ui/hud.js';
 import { shake, zoomPulse, tiltPulse } from '../render/camera.js';
 import { flashLane, flashHitLine, flashScreen, bumpAberration } from '../fx/flash.js';
@@ -130,6 +131,8 @@ export function pressDown(lane) {
     state.combo++; if (state.combo > state.maxCombo) state.maxCombo = state.combo;
     state.score += holdResult.add + Math.min(SCORE.COMBO_BONUS_MAX_HOLD, state.combo * 5);
     hitOffsets.push(bestSigned * 1000);
+    pushErrorTick(bestSigned * 1000);
+    showTiming(bestSigned);
     showJudge(holdResult.tier, holdResult.color);
     showCombo(state.combo);
     showHoldToast();
@@ -168,6 +171,8 @@ export function pressDown(lane) {
     state.combo++; if (state.combo > state.maxCombo) state.maxCombo = state.combo;
     state.score += tapResult.add + Math.min(SCORE.COMBO_BONUS_MAX_TAP, state.combo * 7);
     hitOffsets.push(tapSigned * 1000);
+    pushErrorTick(tapSigned * 1000);
+    showTiming(tapSigned);
     const tierLabel = TIER_KEY[tapResult.tier] ? t(TIER_KEY[tapResult.tier]) : tapResult.tier;
     showJudge(tierLabel, tapResult.color);
     showCombo(state.combo);
@@ -200,6 +205,7 @@ export function pressDown(lane) {
     updateHUD();
   } else {
     // Empty tap: mania-style — no combo break, no miss.
+    showTiming(null);
     showJudge('\u2014', '#6a8aa0', 0.6);
   }
 }

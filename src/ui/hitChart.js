@@ -9,8 +9,15 @@ import { t } from '../i18n/i18n.js';
 export function drawHitChart(canvas) {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
-  const W = canvas.width;
-  const H = canvas.height;
+  if (!ctx) return;
+  const cssW = Math.max(280, canvas.clientWidth || 580);
+  const cssH = 120;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.floor(cssW * dpr);
+  canvas.height = Math.floor(cssH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = cssW;
+  const H = cssH;
   ctx.clearRect(0, 0, W, H);
 
   const rangeMs = 250; // ±250 ms

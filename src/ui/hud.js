@@ -3,6 +3,7 @@
 import { state } from '../game/state.js';
 import { getLocale } from '../i18n/i18n.js';
 import { computeAccuracy, hitCount } from '../game/accuracy.js';
+import { t } from '../i18n/i18n.js';
 import { settings } from '../game/settings.js';
 
 export function updateHUD() {
@@ -28,15 +29,23 @@ export function updateHUD() {
       : pct > 25
         ? 'linear-gradient(90deg,#ffb066,#ffd86a)'
         : 'linear-gradient(90deg,#ff5566,#ff9db0)';
+    hpRow.classList.toggle('danger', !hide && pct <= 25);
   }
 }
 
 export function updateSongProgress(tSong, duration) {
   const bar = document.getElementById('songProgressFill');
-  if (!bar) return;
   const dur = duration || 1;
   const pct = Math.max(0, Math.min(1, tSong / dur));
-  bar.style.width = (pct * 100).toFixed(2) + '%';
+  if (bar) bar.style.width = (pct * 100).toFixed(2) + '%';
+  const timeEl = document.getElementById('songTime');
+  if (timeEl) timeEl.textContent = t('hud.time', { cur: fmtTime(tSong), tot: fmtTime(dur) });
+}
+
+function fmtTime(sec) {
+  const s = Math.max(0, Math.floor(sec || 0));
+  const m = Math.floor(s / 60);
+  return m + ':' + String(s % 60).padStart(2, '0');
 }
 
 export function setSongProgressVisible(on) {

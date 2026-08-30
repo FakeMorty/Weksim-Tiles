@@ -98,6 +98,8 @@ function makeCard(track, num) {
   });
   card.querySelector('.lib-btn.del').addEventListener('click', (e) => {
     e.stopPropagation();
+    const label = stripExt(track.name);
+    if (!confirm(t('menu.confirmRemoveTrack', { name: label }))) return;
     removeTrack(track.id);
   });
   card.addEventListener('click', () => {
@@ -106,6 +108,10 @@ function makeCard(track, num) {
       state.currentTrackId = track.id;
       render();
     }
+  });
+  card.addEventListener('dblclick', (e) => {
+    if (e.target.closest('button')) return;
+    if (onPlayCb) onPlayCb(track);
   });
   return card;
 }

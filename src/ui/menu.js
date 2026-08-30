@@ -8,6 +8,7 @@ import { t, onLocaleChange } from '../i18n/i18n.js';
 import { addTrack, getTrack, updateTrack, listTracks, difficultyStars, guessGenreFromBpm } from '../game/library.js';
 import { bindLibrary, render as renderLibrary } from './library.js';
 import { showPreview } from './preview.js';
+import { notice } from './notice.js';
 import { buildDemoTrack } from '../audio/demoTrack.js';
 import { applyKeyLabels } from '../game/keys.js';
 
@@ -363,7 +364,7 @@ async function startGameSequence() {
     }, delay);
   } catch (e) {
     console.error(e);
-    alert(t('common.error') + ': ' + e);
+    notice(t('common.error') + ': ' + e, 4200);
     btn.disabled = false;
     updatePlayButton();
     document.getElementById('topNote').style.display = 'none';
@@ -420,7 +421,7 @@ async function loadDemoAndPlay() {
     await startGameSequence();
   } catch (e) {
     console.error(e);
-    alert(t('common.error') + ': ' + e);
+    notice(t('common.error') + ': ' + e, 4200);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = t('menu.demoBtn'); }
   }

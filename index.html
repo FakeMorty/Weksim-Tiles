@@ -148,7 +148,8 @@
   #statsScreen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(3,5,12,0.94);backdrop-filter:blur(10px);z-index:11;padding:20px;}
   .stats-panel{width:min(760px,95vw);max-height:90vh;overflow-y:auto;background:linear-gradient(180deg,#0b1124aa,#070a18cc);border:1px solid #1d2a4a;border-radius:18px;padding:26px;}
   .stats-panel h2{font-family:system-ui,'Segoe UI',sans-serif;color:#7efaff;font-size:22px;margin-bottom:14px;letter-spacing:.06em;}
-  .stats-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
+  .stats-summary{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
+  @media(max-width:640px){.stats-summary{grid-template-columns:1fr 1fr}}
   .stats-summary .cell{background:#0a1530;border:1px solid #1a2f52;border-radius:12px;padding:12px;text-align:center;}
   .stats-summary .cell b{display:block;font-family:system-ui,'Segoe UI',sans-serif;font-size:20px;color:#eaffff;margin-top:4px;}
   .stats-summary .cell span{font-size:11px;color:#6a8fb0;letter-spacing:.08em;text-transform:uppercase;}
@@ -179,14 +180,41 @@
   .preview-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:14px;width:min(640px,90vw);}
   .preview-actions .play-btn,.preview-actions .pause-btn{margin:0;flex:1;min-width:140px;}
   #calibrationScreen,#statsScreen{overflow-y:auto;justify-content:flex-start;padding:28px 12px 48px;}
+
+  button:focus-visible, select:focus-visible, input:focus-visible{outline:2px solid #7efaff;outline-offset:2px;}
+  body.hide-cursor, body.hide-cursor *{cursor:none !important;}
+  #timingText{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);font-size:12px;letter-spacing:.16em;opacity:0;transition:.12s;pointer-events:none;z-index:4;text-transform:uppercase;}
+  #songTime{position:absolute;top:8px;left:50%;transform:translateX(-50%);font-size:11px;color:#7aa9c6;letter-spacing:.08em;z-index:8;display:none;pointer-events:none;}
+  #errorBarWrap{position:absolute;left:50%;bottom:72px;transform:translateX(-50%);z-index:6;pointer-events:none;display:none;}
+  #errorBarCanvas{width:min(360px,70vw);height:36px;}
+  #noticeBar{position:absolute;top:18px;left:50%;transform:translateX(-50%) translateY(-12px);z-index:40;pointer-events:none;opacity:0;transition:opacity .18s,transform .18s;background:#0b1530ee;border:1px solid #2a4a70;border-radius:12px;padding:10px 16px;font-size:13px;color:#eaffff;max-width:min(520px,90vw);text-align:center;box-shadow:0 10px 40px #0008;white-space:pre-wrap;}
+  #noticeBar.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #helpOverlay{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(3,5,12,0.88);backdrop-filter:blur(10px);z-index:25;padding:24px 12px;}
+  #helpOverlay.active{display:flex;}
+  .help-body{white-space:pre-wrap;text-align:left;color:#bfefff;font-size:13px;line-height:1.7;margin:12px 0 18px;font-family:ui-monospace,monospace;}
+  #resultGrade{font-family:system-ui,'Segoe UI',sans-serif;font-weight:800;font-size:clamp(64px,12vw,112px);line-height:1;letter-spacing:.06em;text-shadow:0 0 28px currentColor;margin:2px 0 4px;}
+  #resultGrade.pop{animation:gradePop .45s cubic-bezier(.2,1.4,.4,1);}
+  @keyframes gradePop{from{transform:scale(.45);opacity:0}to{transform:scale(1);opacity:1}}
+  #resultBadges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;min-height:22px;margin-bottom:6px;}
+  #resultBadges .badge{border:1px solid #2a4a70;border-radius:999px;padding:3px 10px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;}
+  #resultTrackName{font-size:12px;color:#7aa9c6;margin-bottom:4px;word-break:break-all;}
+  #hpRow.danger .hp-track i{animation:hpPulse .7s ease-in-out infinite;}
+  @keyframes hpPulse{50%{filter:brightness(1.45)}}
+  .hud-track{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#8ecae0;}
+  @media (prefers-reduced-motion: reduce){
+    #resultGrade.pop,#hpRow.danger .hp-track i{animation:none;}
+    #noticeBar{transition:none;}
+  }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
 <div id="songProgress"><i id="songProgressFill"></i></div>
+<div id="songTime">0:00 / 0:00</div>
 
 <div id="comboText"></div>
 <div id="judgeText"></div>
+<div id="timingText"></div>
 <div id="holdToast">HOLD!</div>
 <div id="topNote"></div>
 
@@ -203,6 +231,7 @@
 <div id="hud">
   <div id="hudLeft">
     <div class="hud-pill"><span data-i18n="hud.score">SCORE</span> <span class="hud-big" id="scoreEl" style="margin-left:8px">0</span></div>
+    <div class="hud-pill hud-track" id="hudTrack">—</div>
     <div class="hud-pill"><span data-i18n="hud.accuracy">ACC</span> <span id="accEl">100%</span> • <span id="hitsEl">0 / 0</span></div>
   </div>
   <div id="hudRight" style="text-align:right">
@@ -218,6 +247,8 @@
   <div class="lane-key" id="lk2">J<div class="holdbar"><i></i></div></div>
   <div class="lane-key" id="lk3">K<div class="holdbar"><i></i></div></div>
 </div>
+
+<div id="errorBarWrap"><canvas id="errorBarCanvas" width="320" height="36"></canvas></div>
 
 <div id="menu">
   <h1>RHYTHM SHOOTER</h1>
@@ -291,6 +322,9 @@
 <div id="result">
   <div class="panel result-card">
     <div class="subtitle" id="resultTitle" data-i18n="results.missionComplete">MISSION COMPLETE</div>
+    <div id="resultGrade">—</div>
+    <div id="resultBadges"></div>
+    <div id="resultTrackName">—</div>
     <div class="result-score" id="finalScore">0</div>
     <div class="result-grid">
       <div class="result-item"><span data-i18n="results.accuracy">Accuracy</span><b id="finalAcc">0%</b></div>
@@ -322,6 +356,7 @@
       <button class="pause-btn" id="exportVideoBtn" style="flex:1;margin:0" data-i18n="results.exportVideo">🎬 Export replay as video</button>
     </div>
     <div class="ghost" style="margin-top:12px" data-i18n="results.footer">Auto BPM sync on. Change "Lead" Slow/Normal/Fast for comfort.</div>
+    <div class="ghost" style="margin-top:4px" data-i18n="results.shortcuts">R / Space — retry · Esc — menu</div>
   </div>
 </div>
 
@@ -380,6 +415,7 @@
       <div class="cell"><span data-i18n="stats.totalPlays">Games total</span><b id="statsTotalPlays">0</b></div>
       <div class="cell"><span data-i18n="stats.notesHit">Notes played</span><b id="statsNotesHit">0</b></div>
       <div class="cell"><span data-i18n="stats.playtime">Hours of music</span><b id="statsPlaytime">0</b></div>
+      <div class="cell"><span data-i18n="stats.avgAcc">Avg accuracy</span><b id="statsAvgAcc">—</b></div>
     </div>
     <div class="stats-list" id="statsList"></div>
     <div class="cal-row" style="margin-top:16px">
@@ -574,6 +610,18 @@
   </div>
 </div>
 
+<div id="noticeBar"></div>
+<div id="helpOverlay">
+  <div class="pause-panel">
+    <div class="pause-title" data-i18n="menu.shortcutsTitle">SHORTCUTS</div>
+    <div class="help-body" id="helpBody" data-i18n="menu.shortcutsBody">Enter — play
+Space / R — retry
+Esc — pause / close
+? — this list
+D F J K — lanes</div>
+    <button class="pause-btn primary" id="helpCloseBtn" data-i18n="common.close">Close</button>
+  </div>
+</div>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

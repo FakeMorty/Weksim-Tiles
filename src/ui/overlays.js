@@ -41,3 +41,10 @@ export function bindOverlayEsc() {
     }
   });
 }
+
+function bindBackdrop(id, closeBtnId) {
+  const el = document.getElementById(id);
+  el?.addEventListener('click', e => {
+    if (e.target === el) document.getElementById(closeBtnId)?.click();
+  });
+}

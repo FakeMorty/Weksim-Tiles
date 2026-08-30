@@ -100,12 +100,15 @@ export function recentPlays(limit = 20) {
  */
 export function totalStats() {
   const data = load();
-  const t = { plays: data.plays.length, notesHit: 0, notesTotal: 0, playtimeSec: 0 };
+  const t = { plays: data.plays.length, notesHit: 0, notesTotal: 0, playtimeSec: 0, avgAcc: null };
+  let accSum = 0, accN = 0;
   for (const p of data.plays) {
     t.notesHit += (p.perfects + p.goods + (p.marvelous || 0) + (p.greats || 0) + (p.oks || 0));
     t.notesTotal += p.notes;
     t.playtimeSec += p.durationSec;
+    if (typeof p.accuracy === 'number') { accSum += p.accuracy; accN++; }
   }
+  if (accN) t.avgAcc = Math.round(accSum / accN);
   return t;
 }
 
