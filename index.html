@@ -264,7 +264,7 @@
       <div id="libraryHeader" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; cursor:pointer; user-select:none;">
         <div style="font-size:11px; color:#7aa9c6; text-transform:uppercase; letter-spacing:.08em; display:flex; align-items:center; gap:8px;">
           <span id="libraryChevron" style="display:inline-block; transition:transform .15s; color:#00d0ff;">▼</span>
-          <span data-i18n="menu.libraryHeader">Track library (this session)</span>
+          <span data-i18n="menu.libraryHeader">Track library</span>
           <span id="libraryCount" style="color:#5a89a6; font-size:10px;"></span>
         </div>
         <button id="libClearBtn" style="background:#161a34; color:#8899c0; border:1px solid #2a3c66; border-radius:8px; padding:4px 10px; font-size:11px; cursor:pointer; font-family:ui-monospace,'Cascadia Mono',Consolas,monospace;" data-i18n="menu.libraryClear">Clear all</button>
@@ -393,99 +393,109 @@
 <div id="settingsScreen">
   <div class="panel">
     <div class="cal-title" data-i18n="menu.settingsTitle">SETTINGS</div>
+
     <div class="settings-section">
       <h3 data-i18n="menu.settingsGameplay">Gameplay</h3>
-    <div class="sliders">
-      <div class="slider-box">
-        <label><span data-i18n="menu.sensitivity">Sensitivity</span> <span id="sensVal">1.25σ</span></label>
-        <input type="range" id="sens" min="0.5" max="2.5" step="0.05" value="1.25">
+      <div class="sliders">
+        <div class="slider-box">
+          <label><span data-i18n="menu.sensitivity">Sensitivity</span> <span id="sensVal">1.25σ</span></label>
+          <input type="range" id="sens" min="0.5" max="2.5" step="0.05" value="1.25">
+        </div>
+        <div class="slider-box">
+          <label><span data-i18n="menu.fallSpeed">Fall speed</span> <span id="fallVal" data-i18n="menu.fallSpeedAuto">Auto BPM</span></label>
+          <input type="range" id="fallSpeed" min="0.85" max="2.4" step="0.05" value="1.45">
+          <small id="fallHint" style="color:#5a8dad;font-size:10px" data-i18n="menu.fallHintAuto">Auto by BPM, can be disabled below</small>
+        </div>
+        <div class="slider-box">
+          <label><span data-i18n="menu.holdAmount">Long notes</span> <span id="holdVal" data-i18n="menu.holdAuto">Auto</span></label>
+          <input type="range" id="holdAmt" min="0" max="2" step="1" value="1">
+        </div>
+        <div class="slider-box">
+          <label><span data-i18n="menu.warmup">Warmup count-in</span> <span id="warmupBeatsVal">4</span></label>
+          <input type="range" id="warmupBeats" min="0" max="8" step="1" value="4">
+          <small style="color:#5a8dad;font-size:10px" data-i18n="menu.warmupHint">0 = off, 4 = one bar</small>
+        </div>
       </div>
-      <div class="slider-box">
-        <label><span data-i18n="menu.fallSpeed">Fall speed</span> <span id="fallVal" data-i18n="menu.fallSpeedAuto">Auto BPM</span></label>
-        <input type="range" id="fallSpeed" min="0.85" max="2.4" step="0.05" value="1.45">
-        <small id="fallHint" style="color:#5a8dad;font-size:10px" data-i18n="menu.fallHintAuto">Auto by BPM, can be disabled below</small>
-      </div>
-      <div class="slider-box">
-        <label><span data-i18n="menu.holdAmount">Long notes</span> <span id="holdVal" data-i18n="menu.holdAuto">Auto</span></label>
-        <input type="range" id="holdAmt" min="0" max="2" step="1" value="1">
-      </div>
-    </div>
-
-    <div class="toggle-row">
-      <label><input type="checkbox" id="bpmAuto" checked> <span data-i18n="menu.bpmAuto">Auto BPM — sync speed</span></label>
-      <label><span data-i18n="menu.beatsLead">Lead:</span>
-        <select id="beatsLead">
-          <option value="2.5" data-i18n="menu.beatsLeadSlow">Slow 2.5 beats</option>
-          <option value="2.0" selected data-i18n="menu.beatsLeadNormal">Normal 2.0 beats</option>
-          <option value="1.6" data-i18n="menu.beatsLeadFast">Fast 1.6 beats</option>
-        </select>
-      </label>
-      <label><input type="checkbox" id="holdEnable" checked> <span data-i18n="menu.holdNotesToggle">HOLD notes</span></label>
-      <label><input type="checkbox" id="dualEnable" checked> <span data-i18n="menu.chordsToggle">Chords</span></label>
-      <label><input type="checkbox" id="autoLane" checked> <span data-i18n="menu.smartLaneToggle">Smart lane layout</span></label>
-      <label><input type="checkbox" id="bgReactiveCheck" checked> <span data-i18n="menu.bgReactive">Background pulse</span></label>
-      <label><input type="checkbox" id="bgSpectrumCheck"> <span data-i18n="menu.bgSpectrum">Bottom equaliser</span></label>
-      <label><input type="checkbox" id="vignetteCheck" checked> <span data-i18n="menu.vignette">Vignette</span></label>
-      <label><input type="checkbox" id="noteTrailsCheck" checked> <span data-i18n="menu.noteTrails">Note trails</span></label>
-      <label><input type="checkbox" id="motionBlurCheck"> <span data-i18n="menu.motionBlur">Motion blur</span></label>
-      <label><input type="checkbox" id="bloomCheck"> <span data-i18n="menu.bloom">Bloom (expensive)</span></label>
-    </div>
-
-    <div class="sliders" style="margin-top:14px">
-      <div class="slider-box">
-        <label data-i18n="menu.fxQuality">FX quality</label>
-        <select id="fxQualitySelect">
-          <option value="high" data-i18n="menu.fxHigh">High (bloom, aberration, all particles)</option>
-          <option value="medium" data-i18n="menu.fxMedium">Medium (no aberration)</option>
-          <option value="low" data-i18n="menu.fxLow">Low (for weak PCs)</option>
-        </select>
-      </div>
-      <div class="slider-box">
-        <label data-i18n="menu.hpss">HPSS (signal separation)</label>
-        <select id="hpssModeSelect">
-          <option value="off" data-i18n="menu.hpssOff">Off (fast, for clean tracks)</option>
-          <option value="hard" selected data-i18n="menu.hpssHard">Hard (standard, best for drums)</option>
-          <option value="soft" data-i18n="menu.hpssSoft">Soft (smooth, best for mixed)</option>
-          <option value="iterative" data-i18n="menu.hpssIterative">Iterative (max quality, ×2 slower)</option>
-        </select>
-      </div>
-      <div class="slider-box">
-        <label data-i18n="menu.nmf">NMF instrument refinement</label>
-        <select id="nmfModeSelect">
-          <option value="off" data-i18n="menu.nmfOff">Off (fastest)</option>
-          <option value="fast" data-i18n="menu.nmfFast">Fast (+2s, weak PCs)</option>
-          <option value="auto" selected data-i18n="menu.nmfAuto">Auto (+4s, recommended)</option>
-          <option value="quality" data-i18n="menu.nmfQuality">Quality (+6s, best)</option>
-        </select>
-      </div>
-      <div class="slider-box">
-        <label><span data-i18n="menu.hitSound">Hit sound (you)</span></label>
-        <select id="hitSoundSelect">
-          <option value="off" data-i18n="menu.hitSoundOff">Off</option>
-          <option value="click" data-i18n="menu.hitSoundClick">Click</option>
-          <option value="kick" data-i18n="menu.hitSoundKick">Kick</option>
-          <option value="snare" data-i18n="menu.hitSoundSnare">Snare</option>
-          <option value="custom" data-i18n="menu.hitSoundCustom">Custom sample…</option>
-        </select>
-        <input type="file" id="hitSoundFile" accept="audio/*" style="display:none">
-        <div id="hitSoundStatus" style="font-size:10px;color:#5da6c8;margin-top:4px"></div>
-      </div>
-      <div class="slider-box">
-        <label><span data-i18n="menu.warmup">Warmup count-in</span> <span id="warmupBeatsVal">4</span></label>
-        <input type="range" id="warmupBeats" min="0" max="8" step="1" value="4">
-        <small style="color:#5a8dad;font-size:10px" data-i18n="menu.warmupHint">0 = off, 4 = one bar</small>
-      </div>
-      <div class="slider-box">
-        <label data-i18n="meta.langLabel">Language</label>
-        <select id="languageSelect"></select>
-      </div>
-    </div>
-
-
       <div class="toggle-row">
+        <label><input type="checkbox" id="bpmAuto" checked> <span data-i18n="menu.bpmAuto">Auto BPM — sync speed</span></label>
+        <label><span data-i18n="menu.beatsLead">Lead:</span>
+          <select id="beatsLead">
+            <option value="2.5" data-i18n="menu.beatsLeadSlow">Slow 2.5 beats</option>
+            <option value="2.0" selected data-i18n="menu.beatsLeadNormal">Normal 2.0 beats</option>
+            <option value="1.6" data-i18n="menu.beatsLeadFast">Fast 1.6 beats</option>
+          </select>
+        </label>
+        <label><input type="checkbox" id="holdEnable" checked> <span data-i18n="menu.holdNotesToggle">HOLD notes</span></label>
+        <label><input type="checkbox" id="dualEnable" checked> <span data-i18n="menu.chordsToggle">Chords</span></label>
+        <label><input type="checkbox" id="autoLane" checked> <span data-i18n="menu.smartLaneToggle">Smart lane layout</span></label>
         <label><input type="checkbox" id="noFailCheck"> <span data-i18n="menu.noFail">No Fail (never die)</span></label>
       </div>
     </div>
+
+    <div class="settings-section">
+      <h3 data-i18n="menu.settingsAudio">Audio</h3>
+      <div class="sliders">
+        <div class="slider-box">
+          <label><span data-i18n="menu.hitSound">Hit sound (you)</span></label>
+          <select id="hitSoundSelect">
+            <option value="off" data-i18n="menu.hitSoundOff">Off</option>
+            <option value="click" data-i18n="menu.hitSoundClick">Click</option>
+            <option value="kick" data-i18n="menu.hitSoundKick">Kick</option>
+            <option value="snare" data-i18n="menu.hitSoundSnare">Snare</option>
+            <option value="custom" data-i18n="menu.hitSoundCustom">Custom sample…</option>
+          </select>
+          <input type="file" id="hitSoundFile" accept="audio/*" style="display:none">
+          <div id="hitSoundStatus" style="font-size:10px;color:#5da6c8;margin-top:4px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3 data-i18n="menu.settingsVisual">Visuals</h3>
+      <div class="sliders">
+        <div class="slider-box">
+          <label data-i18n="menu.fxQuality">FX quality</label>
+          <select id="fxQualitySelect">
+            <option value="high" data-i18n="menu.fxHigh">High (bloom, aberration, all particles)</option>
+            <option value="medium" data-i18n="menu.fxMedium">Medium (no aberration)</option>
+            <option value="low" data-i18n="menu.fxLow">Low (for weak PCs)</option>
+          </select>
+        </div>
+      </div>
+      <div class="toggle-row">
+        <label><input type="checkbox" id="bgReactiveCheck" checked> <span data-i18n="menu.bgReactive">Background pulse</span></label>
+        <label><input type="checkbox" id="bgSpectrumCheck"> <span data-i18n="menu.bgSpectrum">Bottom equaliser</span></label>
+        <label><input type="checkbox" id="vignetteCheck" checked> <span data-i18n="menu.vignette">Vignette</span></label>
+        <label><input type="checkbox" id="noteTrailsCheck" checked> <span data-i18n="menu.noteTrails">Note trails</span></label>
+        <label><input type="checkbox" id="motionBlurCheck"> <span data-i18n="menu.motionBlur">Motion blur</span></label>
+        <label><input type="checkbox" id="bloomCheck"> <span data-i18n="menu.bloom">Bloom (expensive)</span></label>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3 data-i18n="menu.settingsAnalysis">Analysis</h3>
+      <div class="sliders">
+        <div class="slider-box">
+          <label data-i18n="menu.hpss">HPSS (signal separation)</label>
+          <select id="hpssModeSelect">
+            <option value="off" data-i18n="menu.hpssOff">Off (fast, for clean tracks)</option>
+            <option value="hard" selected data-i18n="menu.hpssHard">Hard (standard, best for drums)</option>
+            <option value="soft" data-i18n="menu.hpssSoft">Soft (smooth, best for mixed)</option>
+            <option value="iterative" data-i18n="menu.hpssIterative">Iterative (max quality, ×2 slower)</option>
+          </select>
+        </div>
+        <div class="slider-box">
+          <label data-i18n="menu.nmf">NMF instrument refinement</label>
+          <select id="nmfModeSelect">
+            <option value="off" data-i18n="menu.nmfOff">Off (fastest)</option>
+            <option value="fast" data-i18n="menu.nmfFast">Fast (+2s, weak PCs)</option>
+            <option value="auto" selected data-i18n="menu.nmfAuto">Auto (+4s, recommended)</option>
+            <option value="quality" data-i18n="menu.nmfQuality">Quality (+6s, best)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
     <div class="settings-section">
       <h3 data-i18n="menu.settingsKeybinds">Controls</h3>
       <div class="cal-desc" data-i18n="menu.keybindHint">Click a lane, then press a key</div>
@@ -495,7 +505,14 @@
         <button type="button" class="keybind-btn" id="keybind2">J</button>
         <button type="button" class="keybind-btn" id="keybind3">K</button>
       </div>
+      <div class="sliders" style="margin-top:14px">
+        <div class="slider-box">
+          <label data-i18n="meta.langLabel">Language</label>
+          <select id="languageSelect"></select>
+        </div>
+      </div>
     </div>
+
     <div class="cal-row" style="margin-top:18px">
       <button class="cal-btn" id="settingsCloseBtn" data-i18n="menu.settingsBack">← Back to menu</button>
     </div>

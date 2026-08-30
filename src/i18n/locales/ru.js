@@ -70,7 +70,7 @@ export const ru = {
     nmfAuto: 'Авто (+4с, рекомендуется)',
     nmfQuality: 'Качество (+6с, лучшее)',
     playButtonPickTrack: 'Сперва загрузи трек',
-    playButtonAnalyze: 'Разобрать [{mode}] и играть',
+    playButtonAnalyze: 'Разобрать [{mode}]',
     playButtonBusy: 'Разбираю…',
     calibrationBtn: '⚙ Настройка задержки',
     statsBtn: '📊 Статистика',

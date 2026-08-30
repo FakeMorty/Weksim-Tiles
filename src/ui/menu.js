@@ -5,7 +5,7 @@ import { analyzeTrack } from '../audio/analyzer.js';
 import { APP_VERSION } from '../config.js';
 import { settings } from '../game/settings.js';
 import { t, onLocaleChange } from '../i18n/i18n.js';
-import { addTrack, getTrack, updateTrack, difficultyStars, guessGenreFromBpm } from '../game/library.js';
+import { addTrack, getTrack, updateTrack, listTracks, difficultyStars, guessGenreFromBpm } from '../game/library.js';
 import { bindLibrary, render as renderLibrary } from './library.js';
 import { showPreview } from './preview.js';
 import { buildDemoTrack } from '../audio/demoTrack.js';
@@ -77,6 +77,7 @@ export function bindMenu() {
   bindLibrary({
     onPlay: (track) => { selectAndPlay(track, { bot: false }); },
     onBot:  (track) => { selectAndPlay(track, { bot: true  }); },
+    onSelect: (track) => { setCurrentTrack(track); updatePlayButton(); },
   });
 
   document.getElementById('playBtn').addEventListener('click', () => {
@@ -361,6 +362,19 @@ async function loadDemoAndPlay() {
   if (analyzing) return;
   if (!state.audioCtx) state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (state.audioCtx.state === 'suspended') await state.audioCtx.resume();
+  const existing = listTracks().find(tr => tr.isDemo);
+  if (existing) {
+    setCurrentTrack(existing);
+    document.getElementById('trackName').textContent = t('menu.fileReady', {
+      name: t('menu.demoName'),
+      duration: existing.duration.toFixed(1),
+      sr: (existing.sampleRate / 1000).toFixed(0),
+    });
+    updatePlayButton();
+    state.botMode = false;
+    await startGameSequence();
+    return;
+  }
   const btn = document.getElementById('demoBtn');
   if (btn) { btn.disabled = true; btn.textContent = t('menu.demoLoading'); }
   try {

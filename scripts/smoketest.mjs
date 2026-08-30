@@ -95,6 +95,7 @@ const modules = [
   'src/audio/demoTrack.js',
   'src/ui/preview.js',
   'src/ui/settings.js',
+  'src/ui/overlays.js',
   'src/i18n/locales/en.js',
   'src/i18n/locales/ru.js',
   'src/i18n/locales/de.js',

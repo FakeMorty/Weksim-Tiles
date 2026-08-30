@@ -13,6 +13,7 @@ import { bindStats } from './ui/stats.js';
 import { bindLanguagePicker } from './ui/language.js';
 import { bindSettings } from './ui/settings.js';
 import { bindPreview } from './ui/preview.js';
+import { bindOverlayEsc } from './ui/overlays.js';
 import { loadLocale, applyTranslations, getLocale, getLocaleDir } from './i18n/i18n.js';
 import { APP_VERSION } from './config.js';
 import { restoreLibrary } from './game/library.js';
@@ -38,6 +39,7 @@ bindStats();
 bindLanguagePicker();
 bindSettings();
 bindPreview();
+bindOverlayEsc();
 idleRender();
 
 // Restore tracks saved in IndexedDB (non-blocking).

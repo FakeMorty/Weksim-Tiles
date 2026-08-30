@@ -8,15 +8,17 @@
 
 import { listTracks, removeTrack, clearAllTracks, onLibraryChange, difficultyStars, guessGenreFromBpm } from '../game/library.js';
 import { state } from '../game/state.js';
-import { t } from '../i18n/i18n.js';
+import { t, onLocaleChange } from '../i18n/i18n.js';
 
 let onPlayCb = null;
 let onBotCb = null;
+let onSelectCb = null;
 let collapsed = false;
 
 export function bindLibrary(handlers) {
   onPlayCb = handlers.onPlay;
   onBotCb = handlers.onBot;
+  onSelectCb = handlers.onSelect || null;
   const clearBtn = document.getElementById('libClearBtn');
   if (clearBtn) {
     clearBtn.addEventListener('click', (e) => {
@@ -35,6 +37,7 @@ export function bindLibrary(handlers) {
     });
   }
   onLibraryChange(render);
+  onLocaleChange(render);
   render();
 }
 
@@ -79,8 +82,8 @@ function makeCard(track, num) {
       <div class="lib-stars">${starRow}</div>
     </div>
     <div class="lib-actions">
-      <button class="lib-btn play" data-i18n="menu.libraryPlay">Play</button>
-      <button class="lib-btn bot" data-i18n="menu.libraryBot" title="Watch bot play">Bot</button>
+      <button class="lib-btn play">${escapeHtml(t('menu.libraryPlay'))}</button>
+      <button class="lib-btn bot">${escapeHtml(t('menu.libraryBot'))}</button>
       <button class="lib-btn del" title="Remove">×</button>
     </div>
   `;
@@ -98,8 +101,11 @@ function makeCard(track, num) {
     removeTrack(track.id);
   });
   card.addEventListener('click', () => {
-    state.currentTrackId = track.id;
-    render();
+    if (onSelectCb) onSelectCb(track);
+    else {
+      state.currentTrackId = track.id;
+      render();
+    }
   });
   return card;
 }
